@@ -958,7 +958,7 @@ app.post('/api/admin/events/:eventId/generate-qr', authenticateSession, async (r
 
 /**
  * GET /api/admin/events/:eventId/export-pdf
- * Query: ?layout=per-page (default) or ?layout=grid
+ * 6 tickets per page (2 columns x 3 rows)
  */
 app.get('/api/admin/events/:eventId/export-pdf', authenticateSession, async (req, res) => {
   try {
@@ -966,7 +966,6 @@ app.get('/api/admin/events/:eventId/export-pdf', authenticateSession, async (req
       return res.status(403).json({ error: 'Not an admin session' });
     }
     const { eventId } = req.params;
-    const layout = req.query.layout || 'per-page';
 
     const event = await dbGet('SELECT * FROM events WHERE id = ?', [eventId]);
     if (!event) {
@@ -988,34 +987,54 @@ app.get('/api/admin/events/:eventId/export-pdf', authenticateSession, async (req
       return res.status(400).json({ error: 'No QR tokens generated. Run "Generate QR" first.' });
     }
 
-    const doc = new PDFDocument({ margin: 50, size: 'A4' });
+    const doc = new PDFDocument({ margin: 40, size: 'A4' });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="event-${eventId}-qr-codes.pdf"`);
     doc.pipe(res);
 
     const mealTypes = await dbAll('SELECT name FROM meal_types WHERE active = 1 ORDER BY start_time');
 
+    const COLS = 2;
+    const ROWS = 3;
+    const TICKETS_PER_PAGE = COLS * ROWS;
+    const PAGE_WIDTH = 595;
+    const PAGE_HEIGHT = 842;
+    const MARGIN = 40;
+    const CELL_W = (PAGE_WIDTH - 2 * MARGIN) / COLS;
+    const CELL_H = (PAGE_HEIGHT - 2 * MARGIN) / ROWS;
+    const QR_SIZE = 95;
+
     for (let i = 0; i < toGenerate.length; i++) {
-      const row = toGenerate[i];
-      const qrData = `EVT:${eventId}|REG:${row.registration_number}|TOKEN:${row.token}`;
-      const qrBuffer = await QRCode.toBuffer(qrData, { width: 180, margin: 1, errorCorrectionLevel: 'H' });
+      const pageIndex = Math.floor(i / TICKETS_PER_PAGE);
+      const indexOnPage = i % TICKETS_PER_PAGE;
+      if (indexOnPage === 0 && i > 0) {
+        doc.addPage();
+      }
 
-      if (i > 0) doc.addPage();
+      const col = indexOnPage % COLS;
+      const row = Math.floor(indexOnPage / COLS);
+      const cellX = MARGIN + col * CELL_W;
+      const cellY = MARGIN + row * CELL_H;
+      const centerX = cellX + CELL_W / 2;
 
-      doc.fontSize(14).font('Helvetica-Bold').text(`Event: ${event.name}`, { align: 'center' });
-      doc.moveDown(0.5);
-      doc.fontSize(10).font('Helvetica').text(`${event.start_date} – ${event.end_date}`, { align: 'center' });
-      doc.moveDown(1);
+      const ticketRow = toGenerate[i];
+      const qrData = `EVT:${eventId}|REG:${ticketRow.registration_number}|TOKEN:${ticketRow.token}`;
+      const qrBuffer = await QRCode.toBuffer(qrData, { width: QR_SIZE, margin: 1, errorCorrectionLevel: 'H' });
 
-      doc.image(qrBuffer, doc.page.margins.left + (doc.page.width - doc.page.margins.left - doc.page.margins.right) / 2 - 90, doc.y, { width: 180, height: 180 });
-      doc.moveDown(1);
+      const qrX = centerX - QR_SIZE / 2;
+      const qrY = cellY + 8;
+      doc.image(qrBuffer, qrX, qrY, { width: QR_SIZE, height: QR_SIZE });
 
-      doc.fontSize(16).font('Helvetica-Bold').text(row.name, { align: 'center' });
-      doc.fontSize(12).font('Helvetica').text(row.registration_number, { align: 'center' });
-      doc.moveDown(0.5);
-      doc.fontSize(9).font('Helvetica').fillColor('#666666').text(
-        mealTypes.map(m => `□ ${m.name}`).join('   '),
-        { align: 'center' }
+      const textLeft = cellX + 6;
+      const textWidth = CELL_W - 12;
+      let textY = qrY + QR_SIZE + 6;
+      doc.fontSize(9).font('Helvetica-Bold').text(ticketRow.name, textLeft, textY, { align: 'center', width: textWidth });
+      textY = doc.y + 2;
+      doc.fontSize(8).font('Helvetica').fillColor('#333333').text(ticketRow.registration_number, textLeft, textY, { align: 'center', width: textWidth });
+      textY = doc.y + 2;
+      doc.fontSize(6).font('Helvetica').fillColor('#666666').text(
+        mealTypes.map(m => `□ ${m.name}`).join('  '),
+        textLeft, textY, { align: 'center', width: textWidth }
       );
     }
 
