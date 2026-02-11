@@ -383,14 +383,15 @@ app.post('/api/vendor/validate-qr', authenticateSession, async (req, res) => {
       return res.status(403).json({ error: 'Not a vendor session' });
     }
 
-    const { qrData, mealTypeId } = req.body;
+    let qrData = (req.body.qrData || '').toString().trim().replace(/[\r\n]+/g, '').replace(/\s+/g, ' ');
+    const { mealTypeId } = req.body;
 
     if (!qrData) {
       return res.status(400).json({ error: 'QR data required' });
     }
 
     // Event mode: EVT:{eventId}|REG:{regNum}|TOKEN:{token}
-    const evtMatch = qrData.match(/EVT:([A-Za-z0-9_-]+)\|REG:([A-Za-z0-9_-]+)\|TOKEN:([A-Z0-9]+)/);
+    const evtMatch = qrData.match(/EVT:([A-Za-z0-9_-]+)\s*\|\s*REG:([A-Za-z0-9_-]+)\s*\|\s*TOKEN:([A-Za-z0-9]+)/i);
     if (evtMatch) {
       const [, eventId, regNum, tokenStr] = evtMatch;
       return handleEventValidation(req, res, { eventId, regNum, tokenStr, mealTypeId });
@@ -530,7 +531,7 @@ async function handleEventValidation(req, res, { eventId, regNum, tokenStr, meal
 
   const eventToken = await dbGet(
     `SELECT * FROM event_qr_tokens
-     WHERE event_id = ? AND user_id = ? AND token = ?`,
+     WHERE event_id = ? AND user_id = ? AND UPPER(TRIM(token)) = UPPER(TRIM(?))`,
     [eventId, user.id, tokenStr]
   );
   if (!eventToken) {
@@ -1002,7 +1003,7 @@ app.get('/api/admin/events/:eventId/export-pdf', authenticateSession, async (req
     const MARGIN = 40;
     const CELL_W = (PAGE_WIDTH - 2 * MARGIN) / COLS;
     const CELL_H = (PAGE_HEIGHT - 2 * MARGIN) / ROWS;
-    const QR_SIZE = 95;
+    const QR_SIZE = 110;
 
     for (let i = 0; i < toGenerate.length; i++) {
       const pageIndex = Math.floor(i / TICKETS_PER_PAGE);
@@ -1019,7 +1020,7 @@ app.get('/api/admin/events/:eventId/export-pdf', authenticateSession, async (req
 
       const ticketRow = toGenerate[i];
       const qrData = `EVT:${eventId}|REG:${ticketRow.registration_number}|TOKEN:${ticketRow.token}`;
-      const qrBuffer = await QRCode.toBuffer(qrData, { width: QR_SIZE, margin: 1, errorCorrectionLevel: 'H' });
+      const qrBuffer = await QRCode.toBuffer(qrData, { width: QR_SIZE, margin: 2, errorCorrectionLevel: 'M' });
 
       const qrX = centerX - QR_SIZE / 2;
       const qrY = cellY + 8;
