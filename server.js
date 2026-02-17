@@ -30,7 +30,7 @@ const db = new sqlite3.Database(process.env.DB_PATH || './meal_system.db', (err)
 // Promisify database operations
 const dbRun = (sql, params = []) => {
   return new Promise((resolve, reject) => {
-    db.run(sql, params, function(err) {
+    db.run(sql, params, function (err) {
       if (err) reject(err);
       else resolve(this);
     });
@@ -55,6 +55,81 @@ const dbAll = (sql, params = []) => {
   });
 };
 
+// Input Sanitization & Validation
+const sanitizeString = (str, maxLen = 100) => {
+  if (typeof str !== 'string') return '';
+  return str.trim().slice(0, maxLen).replace(/[<>'";&]/g, '');
+};
+
+const sanitizeAlphanumeric = (str, maxLen = 50) => {
+  if (typeof str !== 'string') return '';
+  return str.trim().slice(0, maxLen).replace(/[^a-zA-Z0-9_-]/g, '');
+};
+
+const sanitizeNumeric = (str) => {
+  if (typeof str === 'number') return str;
+  if (typeof str !== 'string') return null;
+  const num = parseInt(str, 10);
+  return isNaN(num) ? null : num;
+};
+
+const validateRegistrationNumber = (regNum) => {
+  if (!regNum || typeof regNum !== 'string') return false;
+  return /^[A-Za-z0-9_-]{3,20}$/.test(regNum.trim());
+};
+
+const validatePin = (pin) => {
+  if (!pin || typeof pin !== 'string') return false;
+  return /^\d{4,6}$/.test(pin);
+};
+
+const validatePassword = (password) => {
+  if (!password || typeof password !== 'string') return false;
+  return password.length >= 4 && password.length <= 50;
+};
+
+const validateName = (name) => {
+  if (!name || typeof name !== 'string') return false;
+  const trimmed = name.trim();
+  return trimmed.length >= 2 && trimmed.length <= 100 && /^[a-zA-Z\s'-]+$/.test(trimmed);
+};
+
+// ===== TIME UTILITY FUNCTIONS =====
+
+function timeStringToSeconds(timeStr) {
+  if (!timeStr || typeof timeStr !== 'string') return null;
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  if (isNaN(hours) || isNaN(minutes)) return null;
+  return (hours * 3600) + (minutes * 60);
+}
+
+function getCurrentTimeInSeconds() {
+  const now = new Date();
+  return (now.getHours() * 3600) + (now.getMinutes() * 60) + now.getSeconds();
+}
+
+function isTimeInRange(currentSeconds, startTime, endTime) {
+  const startSeconds = timeStringToSeconds(startTime);
+  const endSeconds = timeStringToSeconds(endTime);
+
+  if (startSeconds === null || endSeconds === null) {
+    return false;
+  }
+
+  if (startSeconds < endSeconds) {
+    return currentSeconds >= startSeconds && currentSeconds < endSeconds;
+  } else {
+    return currentSeconds >= startSeconds || currentSeconds < endSeconds;
+  }
+}
+
+function findActiveMeal(mealTypes) {
+  const currentSeconds = getCurrentTimeInSeconds();
+  return mealTypes.find(m => isTimeInRange(currentSeconds, m.start_time, m.end_time)) || null;
+}
+
+// ===== END TIME UTILITY FUNCTIONS =====
+
 // Utilities
 function generateId() {
   return crypto.randomBytes(8).toString('hex');
@@ -75,7 +150,7 @@ async function verifyPassword(password, hash) {
 // Middleware: Verify Session Token
 const authenticateSession = async (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1];
-  
+
   if (!token) {
     return res.status(401).json({ error: 'No session token provided' });
   }
@@ -105,13 +180,28 @@ const authenticateSession = async (req, res, next) => {
  */
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { name, registrationNumber, pin } = req.body;
+    const rawName = req.body.name;
+    const rawRegNum = req.body.registrationNumber;
+    const rawPin = req.body.pin;
 
-    if (!name || !registrationNumber || !pin) {
+    if (!rawName || !rawRegNum || !rawPin) {
       return res.status(400).json({ error: 'All fields are required' });
     }
 
-    // Check if registration number already exists
+    const name = sanitizeString(rawName, 100);
+    const registrationNumber = sanitizeAlphanumeric(rawRegNum, 20);
+    const pin = sanitizeString(rawPin, 6);
+
+    if (!validateName(rawName)) {
+      return res.status(400).json({ error: 'Invalid name format' });
+    }
+    if (!validateRegistrationNumber(rawRegNum)) {
+      return res.status(400).json({ error: 'Invalid registration number format' });
+    }
+    if (!validatePin(rawPin)) {
+      return res.status(400).json({ error: 'Invalid PIN format (4-6 digits)' });
+    }
+
     const existing = await dbGet(
       'SELECT id FROM users WHERE registration_number = ?',
       [registrationNumber]
@@ -130,9 +220,8 @@ app.post('/api/auth/register', async (req, res) => {
       [userId, registrationNumber, name, pinHash]
     );
 
-    // Create meal allocations for all meal types
     const mealTypes = await dbAll('SELECT id FROM meal_types WHERE active = 1');
-    
+
     for (const mealType of mealTypes) {
       const allocId = generateId();
       await dbRun(
@@ -159,15 +248,32 @@ app.post('/api/auth/register', async (req, res) => {
  */
 app.post('/api/auth/login', async (req, res) => {
   try {
-    const { role, registrationNumber, pin, vendorCode, username, password } = req.body;
+    const rawRole = req.body.role;
+    const rawRegNum = req.body.registrationNumber;
+    const rawPin = req.body.pin;
+    const rawVendorCode = req.body.vendorCode;
+    const rawUsername = req.body.username;
+    const rawPassword = req.body.password;
 
-    if (!role) {
+    if (!rawRole) {
       return res.status(400).json({ error: 'Role required' });
+    }
+
+    const role = sanitizeAlphanumeric(rawRole, 20);
+    if (!['user', 'vendor', 'admin'].includes(role)) {
+      return res.status(400).json({ error: 'Invalid role' });
     }
 
     let userId, vendorId, adminId, sessionData = {};
 
     if (role === 'user') {
+      const registrationNumber = sanitizeAlphanumeric(rawRegNum, 20);
+      const pin = sanitizeString(rawPin, 6);
+
+      if (!validateRegistrationNumber(rawRegNum) || !validatePin(rawPin)) {
+        return res.status(400).json({ error: 'Invalid input format' });
+      }
+
       const user = await dbGet(
         'SELECT * FROM users WHERE registration_number = ?',
         [registrationNumber]
@@ -184,6 +290,12 @@ app.post('/api/auth/login', async (req, res) => {
       userId = user.id;
       sessionData = { userId, name: user.name, regNum: user.registration_number };
     } else if (role === 'vendor') {
+      const vendorCode = sanitizeAlphanumeric(rawVendorCode, 30);
+
+      if (!vendorCode) {
+        return res.status(400).json({ error: 'Vendor code required' });
+      }
+
       const vendor = await dbGet(
         'SELECT * FROM vendors WHERE vendor_code = ?',
         [vendorCode]
@@ -196,6 +308,13 @@ app.post('/api/auth/login', async (req, res) => {
       vendorId = vendor.id;
       sessionData = { vendorId, name: vendor.name };
     } else if (role === 'admin') {
+      const username = sanitizeString(rawUsername, 50);
+      const password = sanitizeString(rawPassword, 50);
+
+      if (!username || !password) {
+        return res.status(400).json({ error: 'Username and password required' });
+      }
+
       const admin = await dbGet(
         'SELECT * FROM admins WHERE username = ?',
         [username]
@@ -254,6 +373,7 @@ app.post('/api/auth/logout', authenticateSession, async (req, res) => {
 
 /**
  * GET /api/user/dashboard
+ * UPDATED: Returns real-time allocation data with accurate remaining counts
  */
 app.get('/api/user/dashboard', authenticateSession, async (req, res) => {
   try {
@@ -263,28 +383,47 @@ app.get('/api/user/dashboard', authenticateSession, async (req, res) => {
 
     const user = await dbGet('SELECT * FROM users WHERE id = ?', [req.session.user_id]);
 
-    const meals = await dbAll(
-      `SELECT mt.id, mt.name, mt.start_time, mt.end_time, 
-              COALESCE(ma.allocated, 0) as allocated, 
-              COALESCE(ma.remaining, 0) as remaining
-       FROM meal_types mt
-       LEFT JOIN meal_allocations ma ON mt.id = ma.meal_type_id AND ma.user_id = ?
-       WHERE mt.active = 1
-       ORDER BY mt.start_time`,
-      [req.session.user_id]
-    );
+    // Get meals with accurate remaining count (calculated from transactions)
+    const meals = await dbAll(`
+      SELECT 
+        mt.id, 
+        mt.name, 
+        mt.start_time, 
+        mt.end_time,
+        ma.id as allocation_id,
+        COALESCE(ma.allocated, 0) as allocated,
+        COALESCE(ma.allocated - COUNT(t.id), COALESCE(ma.allocated, 0)) as remaining,
+        COUNT(t.id) as consumed
+      FROM meal_types mt
+      LEFT JOIN meal_allocations ma ON mt.id = ma.meal_type_id AND ma.user_id = ?
+      LEFT JOIN transactions t ON ma.user_id = t.user_id AND mt.id = t.meal_type_id
+      WHERE mt.active = 1
+      GROUP BY mt.id, mt.name, mt.start_time, mt.end_time, ma.id, ma.allocated
+      ORDER BY mt.start_time
+    `, [req.session.user_id]);
 
-    const now = new Date();
-    const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-    const activeMeal = meals.find(m => currentTime >= m.start_time && currentTime < m.end_time) || null;
+    // Find active meal using new time utility
+    const activeMeal = findActiveMeal(meals) || null;
 
+    // Calculate totals
+    const totalAllocated = meals.reduce((sum, m) => sum + (m.allocated || 0), 0);
+    const totalConsumed = meals.reduce((sum, m) => sum + (m.consumed || 0), 0);
     const totalRemaining = meals.reduce((sum, m) => sum + (m.remaining || 0), 0);
 
     res.json({
-      user: { id: user.id, name: user.name, regNum: user.registration_number },
+      user: {
+        id: user.id,
+        name: user.name,
+        regNum: user.registration_number
+      },
       meals,
       activeMeal,
-      totalRemaining
+      summary: {
+        totalAllocated,
+        totalConsumed,
+        totalRemaining,
+        lastUpdated: new Date().toISOString()
+      }
     });
   } catch (err) {
     console.error('Dashboard error:', err);
@@ -303,15 +442,13 @@ app.post('/api/user/generate-qr', authenticateSession, async (req, res) => {
 
     const user = await dbGet('SELECT * FROM users WHERE id = ?', [req.session.user_id]);
 
-    const now = new Date();
-    const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-    
-    const activeMeal = await dbGet(
-      `SELECT id FROM meal_types
-       WHERE ? >= start_time AND ? < end_time AND active = 1`,
-      [currentTime, currentTime]
+    // Use new time utility functions
+    const allMeals = await dbAll(
+      'SELECT id, start_time, end_time FROM meal_types WHERE active = 1',
+      []
     );
 
+    const activeMeal = findActiveMeal(allMeals);
     if (!activeMeal) {
       return res.status(400).json({ error: 'No active meal period' });
     }
@@ -342,6 +479,7 @@ app.post('/api/user/generate-qr', authenticateSession, async (req, res) => {
 
 /**
  * GET /api/vendor/dashboard
+ * UPDATED: Real-time active meal detection and accurate meal counts (Legacy + Event)
  */
 app.get('/api/vendor/dashboard', authenticateSession, async (req, res) => {
   try {
@@ -350,21 +488,50 @@ app.get('/api/vendor/dashboard', authenticateSession, async (req, res) => {
     }
 
     const vendor = await dbGet('SELECT * FROM vendors WHERE id = ?', [req.session.vendor_id]);
-    const mealTypes = await dbAll('SELECT * FROM meal_types WHERE active = 1 ORDER BY start_time');
-
-    const now = new Date();
-    const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-    
-    const activeMeal = await dbGet(
-      `SELECT * FROM meal_types
-       WHERE ? >= start_time AND ? < end_time AND active = 1`,
-      [currentTime, currentTime]
+    const mealTypes = await dbAll(
+      'SELECT id, name, start_time, end_time, active FROM meal_types WHERE active = 1 ORDER BY start_time',
+      []
     );
+
+    // Find active meal using new time utility
+    const activeMeal = findActiveMeal(mealTypes) || null;
+
+    // Get consumption stats for each meal type (today)
+    const today = new Date().toISOString().split('T')[0];
+    const mealStats = await Promise.all(mealTypes.map(async (meal) => {
+      // Legacy Stats
+      const legacyStats = await dbGet(`
+        SELECT 
+          COUNT(DISTINCT t.user_id) as users_consumed,
+          COUNT(*) as total_redemptions
+        FROM transactions t
+        WHERE t.meal_type_id = ? AND t.transaction_date = ?
+      `, [meal.id, today]);
+
+      // Event Stats
+      const eventStats = await dbGet(`
+        SELECT 
+          COUNT(DISTINCT ec.user_id) as users_consumed,
+          COUNT(*) as total_redemptions
+        FROM event_consumptions ec
+        WHERE ec.meal_type_id = ? AND DATE(ec.consumed_at) = ?
+      `, [meal.id, today]);
+
+      return {
+        ...meal,
+        stats: {
+          usersConsumed: (legacyStats?.users_consumed || 0) + (eventStats?.users_consumed || 0),
+          totalRedemptions: (legacyStats?.total_redemptions || 0) + (eventStats?.total_redemptions || 0)
+        }
+      };
+    }));
 
     res.json({
       vendor: { id: vendor.id, name: vendor.name },
       activeMeal,
-      mealTypes
+      mealTypes: mealStats,
+      today,
+      timestamp: new Date().toISOString()
     });
   } catch (err) {
     console.error('Vendor dashboard error:', err);
@@ -384,7 +551,9 @@ app.post('/api/vendor/validate-qr', authenticateSession, async (req, res) => {
     }
 
     let qrData = (req.body.qrData || '').toString().trim().replace(/[\r\n]+/g, '').replace(/\s+/g, ' ');
-    const { mealTypeId } = req.body;
+    qrData = qrData.slice(0, 500);
+    const rawMealTypeId = req.body.mealTypeId;
+    const mealTypeId = rawMealTypeId ? sanitizeAlphanumeric(rawMealTypeId, 50) : null;
 
     if (!qrData) {
       return res.status(400).json({ error: 'QR data required' });
@@ -394,12 +563,13 @@ app.post('/api/vendor/validate-qr', authenticateSession, async (req, res) => {
     const evtMatch = qrData.match(/EVT:([A-Za-z0-9_-]+)\s*\|\s*REG:([A-Za-z0-9_-]+)\s*\|\s*TOKEN:([A-Za-z0-9]+)/i);
     if (evtMatch) {
       const [, eventId, regNum, tokenStr] = evtMatch;
-      return handleEventValidation(req, res, { eventId, regNum, tokenStr, mealTypeId });
+      return await handleEventValidation(req, res, { eventId, regNum, tokenStr, mealTypeId });
     }
 
     // Legacy mode: REG:{regNum}|TOKEN:{token}
-    const regMatch = qrData.match(/REG:([A-Za-z0-9]+)/);
-    const tokenMatch = qrData.match(/TOKEN:([A-Z0-9]+)/);
+    // Fixed: Allow - and _ in registration numbers, and make robust for token chars
+    const regMatch = qrData.match(/REG:([A-Za-z0-9_\-]+)/i);
+    const tokenMatch = qrData.match(/TOKEN:([A-Za-z0-9]+)/i);
 
     if (!regMatch || !tokenMatch) {
       return res.status(400).json({
@@ -430,9 +600,12 @@ app.post('/api/vendor/validate-qr', authenticateSession, async (req, res) => {
       });
     }
 
+    // Fixed: Case-insensitive token comparison
     const qrToken = await dbGet(
       `SELECT * FROM qr_tokens
-       WHERE user_id = ? AND token = ? AND used = 0
+       WHERE user_id = ? 
+       AND UPPER(TRIM(token)) = UPPER(TRIM(?)) 
+       AND used = 0
        AND expires_at > datetime('now')`,
       [user.id, tokenStr]
     );
@@ -444,15 +617,13 @@ app.post('/api/vendor/validate-qr', authenticateSession, async (req, res) => {
       });
     }
 
-    const now = new Date();
-    const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-    
-    const activeMeal = await dbGet(
-      `SELECT id FROM meal_types
-       WHERE ? >= start_time AND ? < end_time AND active = 1`,
-      [currentTime, currentTime]
+    // Use new time utility functions for active meal detection
+    const allMeals = await dbAll(
+      'SELECT id, start_time, end_time FROM meal_types WHERE active = 1',
+      []
     );
 
+    const activeMeal = findActiveMeal(allMeals);
     if (!activeMeal) {
       return res.status(400).json({
         status: 'denied',
@@ -477,29 +648,49 @@ app.post('/api/vendor/validate-qr', authenticateSession, async (req, res) => {
       });
     }
 
-    // === ATOMIC TRANSACTION ===
-    await dbRun('UPDATE qr_tokens SET used = 1 WHERE id = ?', [qrToken.id]);
-
     const newRemaining = allocation.remaining - 1;
-    await dbRun(
-      `UPDATE meal_allocations SET remaining = ?, updated_at = datetime('now') WHERE id = ?`,
-      [newRemaining, allocation.id]
-    );
-
     const txId = generateId();
     const txDate = new Date().toISOString().split('T')[0];
-    await dbRun(
-      `INSERT INTO transactions
-       (id, user_id, vendor_id, meal_type_id, qr_token_id, meal_remaining_after, transaction_date, transaction_time)
-       VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-      [txId, user.id, req.session.vendor_id, activeMeal.id, qrToken.id, newRemaining, txDate]
-    );
 
-    res.json({
-      status: 'approved',
-      message: `Authorized: ${user.name}`,
-      remaining: newRemaining
-    });
+    try {
+      await new Promise((resolve, reject) => {
+        db.serialize(() => {
+          db.run('UPDATE qr_tokens SET used = 1 WHERE id = ?', [qrToken.id], (err) => {
+            if (err) { reject(err); return; }
+
+            db.run(
+              'UPDATE meal_allocations SET remaining = ?, updated_at = datetime("now") WHERE id = ?',
+              [newRemaining, allocation.id],
+              (err) => {
+                if (err) { reject(err); return; }
+
+                db.run(
+                  'INSERT INTO transactions (id, user_id, vendor_id, meal_type_id, qr_token_id, meal_remaining_after, transaction_date, transaction_time) VALUES (?, ?, ?, ?, ?, ?, ?, datetime("now"))',
+                  [txId, user.id, req.session.vendor_id, activeMeal.id, qrToken.id, newRemaining, txDate],
+                  (err) => {
+                    if (err) { reject(err); return; }
+                    resolve();
+                  }
+                );
+              }
+            );
+          });
+        });
+      });
+
+      res.json({
+        status: 'approved',
+        message: `Authorized: ${user.name}`,
+        remaining: newRemaining
+      });
+    } catch (txErr) {
+      console.error('Transaction error:', txErr);
+      res.status(500).json({
+        status: 'denied',
+        message: 'Transaction failed: ' + txErr.message
+      });
+      return;
+    }
   } catch (err) {
     console.error('QR validation error:', err);
     res.status(500).json({
@@ -536,6 +727,15 @@ async function handleEventValidation(req, res, { eventId, regNum, tokenStr, meal
   );
   if (!eventToken) {
     return res.status(400).json({ status: 'denied', message: 'Invalid Event QR Token' });
+  }
+
+  // Check total meal limit (Max 3)
+  const currentConsumptions = await dbAll(
+    `SELECT id FROM event_consumptions WHERE event_id = ? AND user_id = ?`,
+    [eventId, user.id]
+  );
+  if (currentConsumptions.length >= 3) {
+    return res.status(400).json({ status: 'denied', message: 'Event Meal Limit Reached (Max 3)' });
   }
 
   let mealType;
@@ -590,6 +790,8 @@ async function handleEventValidation(req, res, { eventId, regNum, tokenStr, meal
 
 /**
  * GET /api/admin/dashboard
+ * UPDATED: Real-time stats with pagination and filtering (Legacy + Event)
+ * Query params: offset, limit, mealTypeId, vendorId, dateFilter
  */
 app.get('/api/admin/dashboard', authenticateSession, async (req, res) => {
   try {
@@ -598,33 +800,150 @@ app.get('/api/admin/dashboard', authenticateSession, async (req, res) => {
     }
 
     const today = new Date().toISOString().split('T')[0];
+    const { offset = '0', limit = '20', mealTypeId, vendorId, dateFilter } = req.query;
+    const offsetNum = Math.max(0, parseInt(offset) || 0);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
+    const filterDate = dateFilter || today;
 
-    const stats = await dbAll(
-      `SELECT mt.name, COUNT(t.id) as count
-       FROM meal_types mt
-       LEFT JOIN transactions t ON mt.id = t.meal_type_id AND t.transaction_date = ?
-       WHERE mt.active = 1
-       GROUP BY mt.id, mt.name
-       ORDER BY mt.start_time`,
-      [today]
-    );
+    // Build dynamic WHERE clause for Legacy
+    let legacyWhere = ['t.transaction_date = ?'];
+    let legacyParams = [filterDate];
+
+    // Build dynamic WHERE clause for Event
+    let eventWhere = ['DATE(ec.consumed_at) = ?'];
+    let eventParams = [filterDate];
+
+    if (mealTypeId && mealTypeId !== 'all' && mealTypeId.trim().length > 0) {
+      legacyWhere.push('t.meal_type_id = ?');
+      legacyParams.push(mealTypeId);
+
+      eventWhere.push('ec.meal_type_id = ?');
+      eventParams.push(mealTypeId);
+    }
+
+    if (vendorId && vendorId !== 'all' && vendorId.trim().length > 0) {
+      legacyWhere.push('t.vendor_id = ?');
+      legacyParams.push(vendorId);
+
+      eventWhere.push('ec.vendor_id = ?');
+      eventParams.push(vendorId);
+    }
+
+    const legacyWhereStr = legacyWhere.join(' AND ');
+    const eventWhereStr = eventWhere.join(' AND ');
+
+    // Get summary stats by meal type (Combined)
+    const legacyStats = await dbAll(`
+      SELECT mt.id, mt.name, COALESCE(COUNT(t.id), 0) as count
+      FROM meal_types mt
+      LEFT JOIN transactions t ON mt.id = t.meal_type_id AND ${legacyWhereStr}
+      WHERE mt.active = 1
+      GROUP BY mt.id, mt.name
+      ORDER BY mt.start_time
+    `, legacyParams);
+
+    const eventStats = await dbAll(`
+      SELECT mt.id, mt.name, COALESCE(COUNT(ec.id), 0) as count
+      FROM meal_types mt
+      LEFT JOIN event_consumptions ec ON mt.id = ec.meal_type_id AND ${eventWhereStr}
+      WHERE mt.active = 1
+      GROUP BY mt.id, mt.name
+      ORDER BY mt.start_time
+    `, eventParams);
+
+    // Combine stats
+    const stats = legacyStats.map(ls => {
+      const es = eventStats.find(e => e.id === ls.id);
+      return {
+        id: ls.id,
+        name: ls.name,
+        count: (ls.count || 0) + (es?.count || 0)
+      };
+    });
 
     const total = stats.reduce((sum, s) => sum + (s.count || 0), 0);
 
-    const transactions = await dbAll(
-      `SELECT t.*, u.name as user_name, v.name as vendor_name, mt.name as meal_name
-       FROM transactions t
-       JOIN users u ON t.user_id = u.id
-       JOIN vendors v ON t.vendor_id = v.id
-       JOIN meal_types mt ON t.meal_type_id = mt.id
-       ORDER BY t.transaction_time DESC
-       LIMIT 20`,
-      []
-    );
+    // Get paginated transactions with detailed info (Combined)
+    // We fetch everything matching the filter and sort/paginate in SQL via UNION
+    const combinedParams = [...legacyParams, ...eventParams, limitNum, offsetNum];
+
+    const transactions = await dbAll(`
+      SELECT * FROM (
+        SELECT 
+          t.id,
+          t.transaction_date,
+          strftime('%H:%M:%S', t.transaction_time) as transaction_time,
+          u.id as user_id,
+          u.name as user_name,
+          u.registration_number,
+          v.id as vendor_id,
+          v.name as vendor_name,
+          mt.id as meal_type_id,
+          mt.name as meal_name,
+          t.meal_remaining_after,
+          'legacy' as mode
+        FROM transactions t
+        JOIN users u ON t.user_id = u.id
+        JOIN vendors v ON t.vendor_id = v.id
+        JOIN meal_types mt ON t.meal_type_id = mt.id
+        WHERE ${legacyWhereStr}
+        
+        UNION ALL
+        
+        SELECT 
+          ec.id,
+          DATE(ec.consumed_at) as transaction_date,
+          strftime('%H:%M:%S', ec.consumed_at) as transaction_time,
+          u.id as user_id,
+          u.name as user_name,
+          u.registration_number,
+          COALESCE(v.id, '') as vendor_id,
+          COALESCE(v.name, 'N/A') as vendor_name,
+          mt.id as meal_type_id,
+          mt.name as meal_name,
+          NULL as meal_remaining_after,
+          'event' as mode
+        FROM event_consumptions ec
+        JOIN users u ON ec.user_id = u.id
+        JOIN meal_types mt ON ec.meal_type_id = mt.id
+        LEFT JOIN vendors v ON ec.vendor_id = v.id
+        WHERE ${eventWhereStr}
+      ) combined
+      ORDER BY transaction_time DESC
+      LIMIT ? OFFSET ?
+    `, combinedParams);
+
+    // Get total count for pagination info
+    const legacyCountResult = await dbGet(`
+      SELECT COUNT(*) as total FROM transactions t WHERE ${legacyWhereStr}
+    `, legacyParams);
+
+    const eventCountResult = await dbGet(`
+      SELECT COUNT(*) as total FROM event_consumptions ec WHERE ${eventWhereStr}
+    `, eventParams);
+
+    const totalCount = (legacyCountResult?.total || 0) + (eventCountResult?.total || 0);
 
     res.json({
-      summary: { stats, total, date: today },
-      transactions
+      summary: {
+        stats,
+        total,
+        date: filterDate,
+        lastUpdated: new Date().toISOString()
+      },
+      transactions,
+      pagination: {
+        offset: offsetNum,
+        limit: limitNum,
+        total: totalCount,
+        hasMore: (offsetNum + limitNum) < totalCount,
+        pages: Math.ceil(totalCount / limitNum)
+      },
+      filters: {
+        dateFilter,
+        mealTypeId: mealTypeId || 'all',
+        vendorId: vendorId || 'all'
+      }
     });
   } catch (err) {
     console.error('Admin dashboard error:', err);
@@ -634,6 +953,8 @@ app.get('/api/admin/dashboard', authenticateSession, async (req, res) => {
 
 /**
  * GET /api/admin/daily-breakdown
+ * UPDATED: Combines legacy transactions AND event consumptions
+ * Shows meal consumption across both modes
  */
 app.get('/api/admin/daily-breakdown', authenticateSession, async (req, res) => {
   try {
@@ -643,22 +964,1032 @@ app.get('/api/admin/daily-breakdown', authenticateSession, async (req, res) => {
 
     const { date } = req.query;
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      return res.status(400).json({ error: 'Invalid date format' });
+      return res.status(400).json({ error: 'Invalid date format (YYYY-MM-DD)' });
     }
 
-    const breakdown = await dbAll(
-      `SELECT mt.name, COUNT(t.id) as count
-       FROM meal_types mt
-       LEFT JOIN transactions t ON mt.id = t.meal_type_id AND t.transaction_date = ?
-       WHERE mt.active = 1
-       GROUP BY mt.id, mt.name
-       ORDER BY mt.start_time`,
-      [date]
+    // Legacy mode transactions for this date
+    const legacyBreakdown = await dbAll(`
+      SELECT 
+        mt.id,
+        mt.name, 
+        COALESCE(COUNT(t.id), 0) as count,
+        'legacy' as mode
+      FROM meal_types mt
+      LEFT JOIN transactions t ON mt.id = t.meal_type_id AND t.transaction_date = ?
+      WHERE mt.active = 1
+      GROUP BY mt.id, mt.name
+      ORDER BY mt.start_time
+    `, [date]);
+
+    // Event mode consumptions for this date
+    const eventBreakdown = await dbAll(`
+      SELECT 
+        mt.id,
+        mt.name, 
+        COALESCE(COUNT(ec.id), 0) as count,
+        'event' as mode
+      FROM meal_types mt
+      LEFT JOIN event_consumptions ec ON mt.id = ec.meal_type_id 
+        AND DATE(ec.consumed_at) = ?
+      WHERE mt.active = 1
+      GROUP BY mt.id, mt.name
+      ORDER BY mt.start_time
+    `, [date]);
+
+    // Combined view
+    const combined = await dbAll(`
+      SELECT 
+        mt.id, 
+        mt.name,
+        COALESCE((
+          SELECT COUNT(*) FROM transactions t 
+          WHERE t.meal_type_id = mt.id AND t.transaction_date = ?
+        ), 0) as legacy_count,
+        COALESCE((
+          SELECT COUNT(*) FROM event_consumptions ec 
+          WHERE ec.meal_type_id = mt.id AND DATE(ec.consumed_at) = ?
+        ), 0) as event_count
+      FROM meal_types mt
+      WHERE mt.active = 1
+      ORDER BY mt.start_time
+    `, [date, date]);
+
+    const legacyTotal = legacyBreakdown.reduce((sum, b) => sum + (b.count || 0), 0);
+    const eventTotal = eventBreakdown.reduce((sum, b) => sum + (b.count || 0), 0);
+    const grandTotal = combined.reduce((sum, c) => sum + (c.legacy_count || 0) + (c.event_count || 0), 0);
+
+    res.json({
+      date,
+      breakdown: {
+        legacy: legacyBreakdown,
+        event: eventBreakdown,
+        combined: combined
+      },
+      totals: {
+        legacy: legacyTotal,
+        event: eventTotal,
+        grand_total: grandTotal
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('Daily breakdown error:', err);
+    res.status(500).json({ error: 'Failed to fetch daily breakdown' });
+  }
+});
+
+/**
+ * GET /api/admin/daily-summary
+ * Comprehensive daily summary combining legacy transactions and event consumptions
+ * Supports filtering by date, event, and user
+ */
+app.get('/api/admin/daily-summary', authenticateSession, async (req, res) => {
+  try {
+    if (!req.session.admin_id) {
+      return res.status(403).json({ error: 'Not an admin session' });
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    const { date = today, eventId, userId, mealTypeId, offset = '0', limit = '50' } = req.query;
+    const offsetNum = Math.max(0, parseInt(offset) || 0);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 50));
+
+    // Get all active events for the date
+    const events = await dbAll(`
+      SELECT id, name, start_date, end_date 
+      FROM events 
+      WHERE active = 1 AND start_date <= ? AND end_date >= ?
+      ORDER BY start_date DESC
+    `, [date, date]);
+
+    // Summary by meal type (combined legacy + event)
+    const summaryByMealType = await dbAll(`
+      SELECT 
+        mt.id,
+        mt.name,
+        mt.start_time,
+        COALESCE((
+          SELECT COUNT(*) FROM transactions t 
+          WHERE t.meal_type_id = mt.id AND t.transaction_date = ?
+        ), 0) as legacy_count,
+        COALESCE((
+          SELECT COUNT(*) FROM event_consumptions ec 
+          JOIN events e ON ec.event_id = e.id
+          WHERE ec.meal_type_id = mt.id AND DATE(ec.consumed_at) = ? 
+          AND e.start_date <= ? AND e.end_date >= ?
+        ), 0) as event_count
+      FROM meal_types mt
+      WHERE mt.active = 1
+      ORDER BY mt.start_time
+    `, [date, date, date, date]);
+
+    const legacyTotal = summaryByMealType.reduce((sum, m) => sum + (m.legacy_count || 0), 0);
+    const eventTotal = summaryByMealType.reduce((sum, m) => sum + (m.event_count || 0), 0);
+    const grandTotal = legacyTotal + eventTotal;
+
+    // Summary by event
+    const summaryByEvent = await dbAll(`
+      SELECT 
+        e.id as event_id,
+        e.name as event_name,
+        COUNT(ec.id) as meal_count,
+        COUNT(DISTINCT ec.user_id) as unique_users
+      FROM events e
+      LEFT JOIN event_consumptions ec ON e.id = ec.event_id AND DATE(ec.consumed_at) = ?
+      WHERE e.active = 1 AND e.start_date <= ? AND e.end_date >= ?
+      GROUP BY e.id, e.name
+      ORDER BY e.start_date DESC
+    `, [date, date, date]);
+
+    // Get combined transactions (legacy + event) with details
+    let legacyQuery = `
+      SELECT 
+        t.id,
+        t.transaction_date,
+        strftime('%H:%M:%S', t.transaction_time) as transaction_time,
+        u.id as user_id,
+        u.name as user_name,
+        u.registration_number,
+        v.id as vendor_id,
+        v.name as vendor_name,
+        mt.id as meal_type_id,
+        mt.name as meal_name,
+        t.meal_remaining_after as remaining_after,
+        NULL as event_id,
+        NULL as event_name,
+        'legacy' as mode
+      FROM transactions t
+      JOIN users u ON t.user_id = u.id
+      JOIN vendors v ON t.vendor_id = v.id
+      JOIN meal_types mt ON t.meal_type_id = mt.id
+      WHERE t.transaction_date = ?
+    `;
+
+    let eventQuery = `
+      SELECT 
+        ec.id,
+        DATE(ec.consumed_at) as transaction_date,
+        strftime('%H:%M:%S', ec.consumed_at) as transaction_time,
+        u.id as user_id,
+        u.name as user_name,
+        u.registration_number,
+        COALESCE(v.id, '') as vendor_id,
+        COALESCE(v.name, 'N/A') as vendor_name,
+        mt.id as meal_type_id,
+        mt.name as meal_name,
+        NULL as remaining_after,
+        e.id as event_id,
+        e.name as event_name,
+        'event' as mode
+      FROM event_consumptions ec
+      JOIN users u ON ec.user_id = u.id
+      JOIN meal_types mt ON ec.meal_type_id = mt.id
+      JOIN events e ON ec.event_id = e.id
+      LEFT JOIN vendors v ON ec.vendor_id = v.id
+      WHERE DATE(ec.consumed_at) = ?
+    `;
+
+    let params = [date];
+    let eventParams = [date];
+
+    if (userId && userId !== 'all') {
+      legacyQuery += ` AND t.user_id = ?`;
+      eventQuery += ` AND ec.user_id = ?`;
+      params.push(userId);
+      eventParams.push(userId);
+    }
+
+    if (mealTypeId && mealTypeId !== 'all') {
+      legacyQuery += ` AND t.meal_type_id = ?`;
+      eventQuery += ` AND ec.meal_type_id = ?`;
+      params.push(mealTypeId);
+      eventParams.push(mealTypeId);
+    }
+
+    if (eventId && eventId !== 'all') {
+      // Only show event mode if eventId specified
+      legacyQuery = 'SELECT * FROM (SELECT 1) WHERE 1=0'; // Empty result
+      params = [];
+      eventQuery += ` AND ec.event_id = ?`;
+      eventParams.push(eventId);
+    }
+
+    // Combine results
+    const legacyResults = eventId && eventId !== 'all' ? [] : await dbAll(legacyQuery, params);
+    const eventResults = await dbAll(eventQuery, eventParams);
+
+    let combinedResults = [...legacyResults, ...eventResults];
+
+    // Sort by transaction_time descending
+    combinedResults.sort((a, b) => {
+      const timeA = a.transaction_date + ' ' + a.transaction_time;
+      const timeB = b.transaction_date + ' ' + b.transaction_time;
+      return new Date(timeB) - new Date(timeA);
+    });
+
+    // Paginate
+    const paginatedResults = combinedResults.slice(offsetNum, offsetNum + limitNum);
+    const totalCount = combinedResults.length;
+
+    res.json({
+      date,
+      summary: {
+        byMealType: summaryByMealType.map(m => ({
+          ...m,
+          total: (m.legacy_count || 0) + (m.event_count || 0)
+        })),
+        byEvent: summaryByEvent,
+        totals: {
+          legacy: legacyTotal,
+          event: eventTotal,
+          grandTotal
+        }
+      },
+      transactions: paginatedResults,
+      pagination: {
+        offset: offsetNum,
+        limit: limitNum,
+        total: totalCount,
+        hasMore: (offsetNum + limitNum) < totalCount,
+        pages: Math.ceil(totalCount / limitNum)
+      },
+      filters: {
+        date,
+        eventId: eventId || 'all',
+        userId: userId || 'all',
+        mealTypeId: mealTypeId || 'all'
+      },
+      events,
+      mealTypes: summaryByMealType,
+      lastUpdated: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('Daily summary error:', err);
+    res.status(500).json({ error: 'Failed to fetch daily summary' });
+  }
+});
+
+/**
+ * GET /api/admin/reports
+ * Comprehensive reports endpoint with full filtering capabilities
+ */
+app.get('/api/admin/reports', authenticateSession, async (req, res) => {
+  try {
+    if (!req.session.admin_id) {
+      return res.status(403).json({ error: 'Not an admin session' });
+    }
+
+    const {
+      startDate,
+      endDate,
+      eventId = 'all',
+      userId = 'all',
+      mealTypeId = 'all',
+      offset = '0',
+      limit = '50'
+    } = req.query;
+
+    const defaultStart = new Date();
+    defaultStart.setDate(defaultStart.getDate() - 30);
+    const defaultEnd = new Date().toISOString().split('T')[0];
+
+    const start = (startDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate)) ? startDate : defaultStart.toISOString().split('T')[0];
+    const end = (endDate && /^\d{4}-\d{2}-\d{2}$/.test(endDate)) ? endDate : defaultEnd;
+    const offsetNum = Math.max(0, parseInt(offset) || 0);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 50));
+
+    // Get all events for filter dropdown
+    const events = await dbAll(`
+      SELECT id, name, start_date, end_date 
+      FROM events 
+      WHERE active = 1
+      ORDER BY start_date DESC
+      LIMIT 50
+    `);
+
+    // Get all users for filter dropdown
+    const users = await dbAll(`
+      SELECT id, name, registration_number 
+      FROM users 
+      WHERE active = 1
+      ORDER BY name
+      LIMIT 100
+    `);
+
+    // Get all meal types for filter dropdown
+    const mealTypes = await dbAll(`
+      SELECT id, name, start_time, end_time
+      FROM meal_types 
+      WHERE active = 1
+      ORDER BY start_time
+    `);
+
+    // Build query for legacy transactions
+    let legacyWhere = 't.transaction_date >= ? AND t.transaction_date <= ?';
+    let legacyParams = [start, end];
+
+    if (userId && userId !== 'all') {
+      legacyWhere += ' AND t.user_id = ?';
+      legacyParams.push(userId);
+    }
+
+    if (mealTypeId && mealTypeId !== 'all') {
+      legacyWhere += ' AND t.meal_type_id = ?';
+      legacyParams.push(mealTypeId);
+    }
+
+    const legacyQuery = `
+      SELECT 
+        t.id,
+        t.transaction_date,
+        strftime('%H:%M:%S', t.transaction_time) as transaction_time,
+        u.id as user_id,
+        u.name as user_name,
+        u.registration_number,
+        v.id as vendor_id,
+        v.name as vendor_name,
+        mt.id as meal_type_id,
+        mt.name as meal_name,
+        t.meal_remaining_after as remaining_after,
+        NULL as event_id,
+        NULL as event_name,
+        'legacy' as mode
+      FROM transactions t
+      JOIN users u ON t.user_id = u.id
+      JOIN vendors v ON t.vendor_id = v.id
+      JOIN meal_types mt ON t.meal_type_id = mt.id
+      WHERE ${legacyWhere}
+    `;
+
+    // Build query for event consumptions
+    let eventWhere = 'DATE(ec.consumed_at) >= ? AND DATE(ec.consumed_at) <= ?';
+    let eventParams = [start, end];
+
+    if (eventId && eventId !== 'all') {
+      eventWhere += ' AND ec.event_id = ?';
+      eventParams.push(eventId);
+    }
+
+    if (userId && userId !== 'all') {
+      eventWhere += ' AND ec.user_id = ?';
+      eventParams.push(userId);
+    }
+
+    if (mealTypeId && mealTypeId !== 'all') {
+      eventWhere += ' AND ec.meal_type_id = ?';
+      eventParams.push(mealTypeId);
+    }
+
+    const eventQuery = `
+      SELECT 
+        ec.id,
+        DATE(ec.consumed_at) as transaction_date,
+        strftime('%H:%M:%S', ec.consumed_at) as transaction_time,
+        u.id as user_id,
+        u.name as user_name,
+        u.registration_number,
+        COALESCE(v.id, '') as vendor_id,
+        COALESCE(v.name, 'N/A') as vendor_name,
+        mt.id as meal_type_id,
+        mt.name as meal_name,
+        NULL as remaining_after,
+        e.id as event_id,
+        e.name as event_name,
+        'event' as mode
+      FROM event_consumptions ec
+      JOIN users u ON ec.user_id = u.id
+      JOIN meal_types mt ON ec.meal_type_id = mt.id
+      JOIN events e ON ec.event_id = e.id
+      LEFT JOIN vendors v ON ec.vendor_id = v.id
+      WHERE ${eventWhere}
+    `;
+
+    const legacyResults = eventId && eventId !== 'all' ? [] : await dbAll(legacyQuery, legacyParams);
+    const eventResults = await dbAll(eventQuery, eventParams);
+
+    let combinedResults = [...legacyResults, ...eventResults];
+
+    combinedResults.sort((a, b) => {
+      const timeA = a.transaction_date + ' ' + a.transaction_time;
+      const timeB = b.transaction_date + ' ' + b.transaction_time;
+      return new Date(timeB) - new Date(timeA);
+    });
+
+    const paginatedResults = combinedResults.slice(offsetNum, offsetNum + limitNum);
+    const totalCount = combinedResults.length;
+
+    // Summary stats
+    const stats = {
+      totalRedemptions: totalCount,
+      byMode: {
+        legacy: legacyResults.length,
+        event: eventResults.length
+      },
+      byMealType: {},
+      byEvent: {},
+      byUser: {}
+    };
+
+    const mealTypeMap = new Map();
+
+    combinedResults.forEach(r => {
+      // By Meal Type (Map for Summary)
+      if (!mealTypeMap.has(r.meal_type_id)) {
+        mealTypeMap.set(r.meal_type_id, { id: r.meal_type_id, name: r.meal_name, count: 0 });
+      }
+      mealTypeMap.get(r.meal_type_id).count++;
+
+      // Stats Objects
+      stats.byMealType[r.meal_name] = (stats.byMealType[r.meal_name] || 0) + 1;
+
+      if (r.event_name) {
+        stats.byEvent[r.event_name] = (stats.byEvent[r.event_name] || 0) + 1;
+      }
+      stats.byUser[r.user_name] = (stats.byUser[r.user_name] || 0) + 1;
+    });
+
+    res.json({
+      dateRange: { start, end },
+      filters: {
+        startDate: start,
+        endDate: end,
+        eventId,
+        userId,
+        mealTypeId
+      },
+      stats,
+      summary: {
+        total: totalCount,
+        stats: Array.from(mealTypeMap.values())
+      },
+      transactions: paginatedResults,
+      pagination: {
+        offset: offsetNum,
+        limit: limitNum,
+        total: totalCount,
+        hasMore: (offsetNum + limitNum) < totalCount,
+        pages: Math.ceil(totalCount / limitNum)
+      },
+      filterOptions: {
+        events: events.map(e => ({ id: e.id, name: e.name })),
+        users: users.map(u => ({ id: u.id, name: u.name, regNumber: u.registration_number })),
+        mealTypes: mealTypes.map(m => ({ id: m.id, name: m.name }))
+      },
+      lastUpdated: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('Reports error:', err);
+    res.status(500).json({ error: 'Failed to fetch reports' });
+  }
+});
+
+/**
+ * GET /api/admin/consolidated-report
+ * Returns ALL transactions in the system, grouped by meal periods
+ */
+app.get('/api/admin/consolidated-report', authenticateSession, async (req, res) => {
+  try {
+    if (!req.session.admin_id) {
+      return res.status(403).json({ error: 'Not an admin session' });
+    }
+
+    // Get all meal types
+    const mealTypes = await dbAll(`
+      SELECT id, name, start_time, end_time 
+      FROM meal_types 
+      ORDER BY start_time
+    `);
+
+    // Get all legacy transactions
+    const legacyTransactions = await dbAll(`
+      SELECT 
+        t.id,
+        t.transaction_date,
+        strftime('%H:%M:%S', t.transaction_time) as transaction_time,
+        u.name as user_name,
+        u.registration_number,
+        v.name as vendor_name,
+        mt.id as meal_type_id,
+        mt.name as meal_name,
+        'legacy' as mode
+      FROM transactions t
+      JOIN users u ON t.user_id = u.id
+      JOIN vendors v ON t.vendor_id = v.id
+      JOIN meal_types mt ON t.meal_type_id = mt.id
+      ORDER BY t.transaction_date DESC, t.transaction_time DESC
+    `);
+
+    // Get all event consumptions
+    const eventConsumptions = await dbAll(`
+      SELECT 
+        ec.id,
+        DATE(ec.consumed_at) as transaction_date,
+        strftime('%H:%M:%S', ec.consumed_at) as transaction_time,
+        u.name as user_name,
+        u.registration_number,
+        COALESCE(v.name, 'N/A') as vendor_name,
+        mt.id as meal_type_id,
+        mt.name as meal_name,
+        e.name as event_name,
+        'event' as mode
+      FROM event_consumptions ec
+      JOIN users u ON ec.user_id = u.id
+      JOIN meal_types mt ON ec.meal_type_id = mt.id
+      JOIN events e ON ec.event_id = e.id
+      LEFT JOIN vendors v ON ec.vendor_id = v.id
+      ORDER BY ec.consumed_at DESC
+    `);
+
+    const allTransactions = [...legacyTransactions, ...eventConsumptions];
+
+    // Grouping by meal type
+    const grouped = {};
+    mealTypes.forEach(mt => {
+      grouped[mt.id] = {
+        meal_type: mt.name,
+        time_range: `${mt.start_time} - ${mt.end_time}`,
+        transactions: []
+      };
+    });
+
+    // Add an 'Other' group for transactions that might not match active meal types or if needed
+    // But currently meal_type_id is mandatory in both tables.
+
+    allTransactions.forEach(tx => {
+      if (grouped[tx.meal_type_id]) {
+        grouped[tx.meal_type_id].transactions.push(tx);
+      }
+    });
+
+    res.json({
+      success: true,
+      mealTypes,
+      grouped,
+      totalCount: allTransactions.length,
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('Consolidated report error:', err);
+    res.status(500).json({ error: 'Failed to fetch consolidated report' });
+  }
+});
+
+/**
+ * GET /api/admin/stats/meals-per-day
+ * Returns meals served per day for a date range
+ */
+app.get('/api/admin/stats/meals-per-day', authenticateSession, async (req, res) => {
+  try {
+    if (!req.session.admin_id) {
+      return res.status(403).json({ error: 'Not an admin session' });
+    }
+
+    const { startDate, endDate } = req.query;
+    const defaultStart = new Date();
+    defaultStart.setDate(defaultStart.getDate() - 30);
+    const defaultEnd = new Date().toISOString().split('T')[0];
+
+    const start = (startDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate)) ? startDate : defaultStart.toISOString().split('T')[0];
+    const end = (endDate && /^\d{4}-\d{2}-\d{2}$/.test(endDate)) ? endDate : defaultEnd;
+
+    // Legacy transactions
+    const legacyStats = await dbAll(
+      `SELECT 
+        t.transaction_date as date,
+        mt.name as meal_type,
+        mt.id as meal_type_id,
+        COUNT(t.id) as count,
+        'legacy' as mode
+       FROM transactions t
+       JOIN meal_types mt ON t.meal_type_id = mt.id
+       WHERE t.transaction_date >= ? AND t.transaction_date <= ?
+       GROUP BY t.transaction_date, mt.id, mt.name
+       ORDER BY t.transaction_date DESC, mt.start_time`,
+      [start, end]
     );
 
-    res.json({ date, breakdown });
+    // Event consumptions
+    const eventStats = await dbAll(
+      `SELECT 
+        DATE(ec.consumed_at) as date,
+        mt.name as meal_type,
+        mt.id as meal_type_id,
+        COUNT(ec.id) as count,
+        'event' as mode
+       FROM event_consumptions ec
+       JOIN meal_types mt ON ec.meal_type_id = mt.id
+       WHERE DATE(ec.consumed_at) >= ? AND DATE(ec.consumed_at) <= ?
+       GROUP BY DATE(ec.consumed_at), mt.id, mt.name
+       ORDER BY date DESC, mt.start_time`,
+      [start, end]
+    );
+
+    // Combine and deduplicate by date and meal type
+    const combinedMap = new Map();
+
+    legacyStats.forEach(s => {
+      const key = `${s.date}|${s.meal_type_id}`;
+      combinedMap.set(key, { ...s, count: s.count || 0 });
+    });
+
+    eventStats.forEach(s => {
+      const key = `${s.date}|${s.meal_type_id}`;
+      if (combinedMap.has(key)) {
+        const existing = combinedMap.get(key);
+        combinedMap.set(key, { ...existing, count: existing.count + s.count, mode: 'combined' });
+      } else {
+        combinedMap.set(key, { ...s, count: s.count || 0, mode: 'combined' });
+      }
+    });
+
+    const stats = Array.from(combinedMap.values()).sort((a, b) => b.date.localeCompare(a.date));
+
+    // Daily totals (combined)
+    const dailyTotalsMap = new Map();
+    stats.forEach(s => {
+      const current = dailyTotalsMap.get(s.date) || 0;
+      dailyTotalsMap.set(s.date, current + s.count);
+    });
+
+    const dailyTotals = Array.from(dailyTotalsMap.entries())
+      .map(([date, total]) => ({ date, total }))
+      .sort((a, b) => b.date.localeCompare(a.date));
+
+    res.json({
+      startDate: start,
+      endDate: end,
+      mealsPerDay: stats,
+      dailyTotals,
+      summary: {
+        totalMeals: dailyTotals.reduce((sum, d) => sum + d.total, 0),
+        totalDays: dailyTotals.length,
+        legacyMeals: legacyStats.reduce((sum, s) => sum + s.count, 0),
+        eventMeals: eventStats.reduce((sum, s) => sum + s.count, 0)
+      }
+    });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch daily breakdown' });
+    console.error('Meals per day error:', err);
+    res.status(500).json({ error: 'Failed to fetch meals per day' });
+  }
+});
+
+/**
+ * GET /api/admin/stats/daily-matrix
+ * Returns a matrix of dates and meal types with counts
+ */
+app.get('/api/admin/stats/daily-matrix', authenticateSession, async (req, res) => {
+  try {
+    if (!req.session.admin_id) {
+      return res.status(403).json({ error: 'Not an admin session' });
+    }
+
+    const { startDate, endDate } = req.query;
+    const defaultStart = new Date();
+    defaultStart.setDate(defaultStart.getDate() - 30);
+    const defaultEnd = new Date().toISOString().split('T')[0];
+
+    const start = (startDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate)) ? startDate : defaultStart.toISOString().split('T')[0];
+    const end = (endDate && /^\d{4}-\d{2}-\d{2}$/.test(endDate)) ? endDate : defaultEnd;
+
+    // Get all active meal types to use as columns
+    const mealTypes = await dbAll('SELECT id, name FROM meal_types WHERE active = 1 ORDER BY start_time');
+
+    // Get combined stats
+    const stats = await dbAll(`
+      SELECT date, meal_type_id, SUM(count) as total_count
+      FROM (
+        SELECT transaction_date as date, meal_type_id, COUNT(*) as count
+        FROM transactions
+        WHERE transaction_date >= ? AND transaction_date <= ?
+        GROUP BY transaction_date, meal_type_id
+        
+        UNION ALL
+        
+        SELECT DATE(consumed_at) as date, meal_type_id, COUNT(*) as count
+        FROM event_consumptions
+        WHERE DATE(consumed_at) >= ? AND DATE(consumed_at) <= ?
+        GROUP BY DATE(consumed_at), meal_type_id
+      )
+      GROUP BY date, meal_type_id
+      ORDER BY date DESC
+    `, [start, end, start, end]);
+
+    // Pivot the data
+    const matrix = {};
+    stats.forEach(s => {
+      if (!matrix[s.date]) {
+        matrix[s.date] = { date: s.date, totals: {}, dailyTotal: 0 };
+        mealTypes.forEach(mt => matrix[s.date].totals[mt.id] = 0);
+      }
+      matrix[s.date].totals[s.meal_type_id] = s.total_count;
+      matrix[s.date].dailyTotal += s.total_count;
+    });
+
+    const rows = Object.values(matrix).sort((a, b) => b.date.localeCompare(a.date));
+
+    res.json({
+      startDate: start,
+      endDate: end,
+      mealTypes,
+      rows,
+      summary: {
+        totalMeals: rows.reduce((sum, r) => sum + r.dailyTotal, 0),
+        totalDays: rows.length
+      }
+    });
+  } catch (err) {
+    console.error('Daily matrix error:', err);
+    res.status(500).json({ error: 'Failed to fetch daily matrix' });
+  }
+});
+
+/**
+ * GET /api/admin/stats/meals-per-time
+ * Returns meals served per time (hourly breakdown)
+ */
+app.get('/api/admin/stats/meals-per-time', authenticateSession, async (req, res) => {
+  try {
+    if (!req.session.admin_id) {
+      return res.status(403).json({ error: 'Not an admin session' });
+    }
+
+    const { date } = req.query;
+    const targetDate = (date && /^\d{4}-\d{2}-\d{2}$/.test(date))
+      ? date
+      : new Date().toISOString().split('T')[0];
+
+    // Legacy transactions
+    const legacyStats = await dbAll(
+      `SELECT 
+        strftime('%H', t.transaction_time) as hour,
+        mt.name as meal_type,
+        mt.id as meal_type_id,
+        COUNT(t.id) as count,
+        'legacy' as mode
+       FROM transactions t
+       JOIN meal_types mt ON t.meal_type_id = mt.id
+       WHERE t.transaction_date = ?
+       GROUP BY hour, mt.id, mt.name
+       ORDER BY hour, mt.start_time`,
+      [targetDate]
+    );
+
+    // Event consumptions
+    const eventStats = await dbAll(
+      `SELECT 
+        strftime('%H', ec.consumed_at) as hour,
+        mt.name as meal_type,
+        mt.id as meal_type_id,
+        COUNT(ec.id) as count,
+        'event' as mode
+       FROM event_consumptions ec
+       JOIN meal_types mt ON ec.meal_type_id = mt.id
+       WHERE DATE(ec.consumed_at) = ?
+       GROUP BY hour, mt.id, mt.name
+       ORDER BY hour, mt.start_time`,
+      [targetDate]
+    );
+
+    // Combine stats
+    const combinedMap = new Map();
+
+    legacyStats.forEach(s => {
+      const key = `${s.hour}|${s.meal_type_id}`;
+      combinedMap.set(key, { ...s, count: s.count || 0 });
+    });
+
+    eventStats.forEach(s => {
+      const key = `${s.hour}|${s.meal_type_id}`;
+      if (combinedMap.has(key)) {
+        const existing = combinedMap.get(key);
+        combinedMap.set(key, { ...existing, count: existing.count + s.count, mode: 'combined' });
+      } else {
+        combinedMap.set(key, { ...s, count: s.count || 0, mode: 'combined' });
+      }
+    });
+
+    const stats = Array.from(combinedMap.values()).sort((a, b) => a.hour.localeCompare(b.hour));
+
+    const hourlyTotalsMap = new Map();
+    stats.forEach(s => {
+      const current = hourlyTotalsMap.get(s.hour) || 0;
+      hourlyTotalsMap.set(s.hour, current + s.count);
+    });
+
+    const hourlyTotals = Array.from(hourlyTotalsMap.entries())
+      .map(([hour, count]) => ({ hour, count }))
+      .sort((a, b) => a.hour.localeCompare(b.hour));
+
+    const peakHour = hourlyTotals.length > 0
+      ? hourlyTotals.reduce((max, curr) => curr.count > max.count ? curr : max)
+      : null;
+
+    res.json({
+      date: targetDate,
+      stats,
+      hourlyTotals,
+      peakHour,
+      summary: {
+        totalMeals: hourlyTotals.reduce((sum, h) => sum + h.count, 0),
+        legacyMeals: legacyStats.reduce((sum, s) => sum + s.count, 0),
+        eventMeals: eventStats.reduce((sum, s) => sum + s.count, 0)
+      }
+    });
+  } catch (err) {
+    console.error('Meals per time error:', err);
+    res.status(500).json({ error: 'Failed to fetch meals per time' });
+  }
+});
+
+/**
+ * POST /api/admin/allocate-meals
+ * Intuitive meal allocation: bulk allocate meals to multiple users
+ */
+app.post('/api/admin/allocate-meals', authenticateSession, async (req, res) => {
+  try {
+    if (!req.session.admin_id) {
+      return res.status(403).json({ error: 'Not an admin session' });
+    }
+
+    const { userIds, mealTypeId, amount, operation } = req.body;
+
+    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(400).json({ error: 'userIds array required' });
+    }
+
+    if (!mealTypeId) {
+      return res.status(400).json({ error: 'mealTypeId required' });
+    }
+
+    const mealType = await dbGet('SELECT id, name FROM meal_types WHERE id = ?', [mealTypeId]);
+    if (!mealType) {
+      return res.status(400).json({ error: 'Invalid meal type' });
+    }
+
+    const validOperations = ['add', 'set', 'reset'];
+    const op = validOperations.includes(operation) ? operation : 'add';
+    const allocAmount = parseInt(amount, 10) || 0;
+
+    let updated = 0;
+    let errors = [];
+
+    for (const userId of userIds) {
+      try {
+        const user = await dbGet('SELECT id FROM users WHERE id = ?', [userId]);
+        if (!user) {
+          errors.push({ userId, error: 'User not found' });
+          continue;
+        }
+
+        let allocation = await dbGet(
+          'SELECT id, allocated, remaining FROM meal_allocations WHERE user_id = ? AND meal_type_id = ?',
+          [userId, mealTypeId]
+        );
+
+        if (!allocation) {
+          const newId = generateId();
+          if (op === 'set') {
+            await dbRun(
+              `INSERT INTO meal_allocations (id, user_id, meal_type_id, allocated, remaining)
+               VALUES (?, ?, ?, ?, ?)`,
+              [newId, userId, mealTypeId, allocAmount, allocAmount]
+            );
+          } else if (op === 'reset') {
+            await dbRun(
+              `INSERT INTO meal_allocations (id, user_id, meal_type_id, allocated, remaining)
+               VALUES (?, ?, ?, 20, 20)`,
+              [newId, userId, mealTypeId]
+            );
+          } else {
+            await dbRun(
+              `INSERT INTO meal_allocations (id, user_id, meal_type_id, allocated, remaining)
+               VALUES (?, ?, ?, ?, ?)`,
+              [newId, userId, mealTypeId, allocAmount, allocAmount]
+            );
+          }
+          updated++;
+        } else {
+          let newAllocated, newRemaining;
+          if (op === 'add') {
+            newAllocated = allocation.allocated + allocAmount;
+            newRemaining = allocation.remaining + allocAmount;
+          } else if (op === 'set') {
+            newAllocated = allocAmount;
+            newRemaining = Math.min(allocAmount, allocation.remaining + (allocAmount - allocation.allocated));
+          } else {
+            newAllocated = 20;
+            newRemaining = 20;
+          }
+
+          await dbRun(
+            `UPDATE meal_allocations SET allocated = ?, remaining = ?, updated_at = datetime('now') WHERE id = ?`,
+            [newAllocated, newRemaining, allocation.id]
+          );
+          updated++;
+        }
+      } catch (err) {
+        errors.push({ userId, error: err.message });
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Updated ${updated} user allocations for ${mealType.name}`,
+      updated,
+      errors: errors.length > 0 ? errors : undefined
+    });
+  } catch (err) {
+    console.error('Allocate meals error:', err);
+    res.status(500).json({ error: 'Failed to allocate meals' });
+  }
+});
+
+/**
+ * POST /api/admin/allocate-meals/all
+ * Allocate meals to ALL active users
+ */
+app.post('/api/admin/allocate-meals/all', authenticateSession, async (req, res) => {
+  try {
+    if (!req.session.admin_id) {
+      return res.status(403).json({ error: 'Not an admin session' });
+    }
+
+    const { mealTypeId, amount, operation } = req.body;
+
+    if (!mealTypeId) {
+      return res.status(400).json({ error: 'mealTypeId required' });
+    }
+
+    const mealType = await dbGet('SELECT id, name FROM meal_types WHERE id = ?', [mealTypeId]);
+    if (!mealType) {
+      return res.status(400).json({ error: 'Invalid meal type' });
+    }
+
+    const validOperations = ['add', 'set', 'reset'];
+    const op = validOperations.includes(operation) ? operation : 'add';
+    const allocAmount = parseInt(amount, 10) || 0;
+
+    const users = await dbAll('SELECT id FROM users WHERE active = 1');
+
+    let updated = 0;
+    for (const user of users) {
+      let allocation = await dbGet(
+        'SELECT id, allocated, remaining FROM meal_allocations WHERE user_id = ? AND meal_type_id = ?',
+        [user.id, mealTypeId]
+      );
+
+      if (!allocation) {
+        const newId = generateId();
+        if (op === 'set') {
+          await dbRun(
+            `INSERT INTO meal_allocations (id, user_id, meal_type_id, allocated, remaining)
+             VALUES (?, ?, ?, ?, ?)`,
+            [newId, user.id, mealTypeId, allocAmount, allocAmount]
+          );
+        } else if (op === 'reset') {
+          await dbRun(
+            `INSERT INTO meal_allocations (id, user_id, meal_type_id, allocated, remaining)
+             VALUES (?, ?, ?, 20, 20)`,
+            [newId, user.id, mealTypeId]
+          );
+        } else {
+          await dbRun(
+            `INSERT INTO meal_allocations (id, user_id, meal_type_id, allocated, remaining)
+             VALUES (?, ?, ?, ?, ?)`,
+            [newId, user.id, mealTypeId, allocAmount, allocAmount]
+          );
+        }
+        updated++;
+      } else {
+        let newAllocated, newRemaining;
+        if (op === 'add') {
+          newAllocated = allocation.allocated + allocAmount;
+          newRemaining = allocation.remaining + allocAmount;
+        } else if (op === 'set') {
+          newAllocated = allocAmount;
+          newRemaining = Math.min(allocAmount, allocation.remaining + (allocAmount - allocation.allocated));
+        } else {
+          newAllocated = 20;
+          newRemaining = 20;
+        }
+
+        await dbRun(
+          `UPDATE meal_allocations SET allocated = ?, remaining = ?, updated_at = datetime('now') WHERE id = ?`,
+          [newAllocated, newRemaining, allocation.id]
+        );
+        updated++;
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Updated ${updated} user allocations for ${mealType.name}`,
+      updated,
+      totalUsers: users.length
+    });
+  } catch (err) {
+    console.error('Allocate all meals error:', err);
+    res.status(500).json({ error: 'Failed to allocate meals to all users' });
   }
 });
 
@@ -887,6 +2218,37 @@ app.post('/api/admin/events/:eventId/registrations', authenticateSession, async 
 });
 
 /**
+ * POST /api/admin/events/:eventId/registrations/all
+ * Registers ALL users to an event
+ */
+app.post('/api/admin/events/:eventId/registrations/all', authenticateSession, async (req, res) => {
+  try {
+    if (!req.session.admin_id) {
+      return res.status(403).json({ error: 'Not an admin session' });
+    }
+    const { eventId } = req.params;
+    const event = await dbGet('SELECT id FROM events WHERE id = ?', [eventId]);
+    if (!event) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+    const users = await dbAll('SELECT id FROM users WHERE active = 1');
+    let added = 0;
+    for (const user of users) {
+      const result = await dbRun(
+        `INSERT OR IGNORE INTO event_registrations (id, event_id, user_id)
+         VALUES (?, ?, ?)`,
+        [generateId(), eventId, user.id]
+      );
+      if (result && result.changes > 0) added++;
+    }
+    res.json({ success: true, added, total: users.length });
+  } catch (err) {
+    console.error('Add all registrations error:', err);
+    res.status(500).json({ error: 'Failed to add registrations' });
+  }
+});
+
+/**
  * DELETE /api/admin/events/:eventId/registrations
  * Body: { userId: string }
  */
@@ -1046,10 +2408,614 @@ app.get('/api/admin/events/:eventId/export-pdf', authenticateSession, async (req
   }
 });
 
+/**
+ * GET /api/admin/live-feed/export-pdf
+ * Generates a PDF of all recent legacy transactions
+ */
+app.get('/api/admin/live-feed/export-pdf', authenticateSession, async (req, res) => {
+  try {
+    if (!req.session.admin_id) {
+      return res.status(403).json({ error: 'Not an admin session' });
+    }
+
+    const transactions = await dbAll(`
+      SELECT 
+        u.name as user_name,
+        v.name as vendor_name,
+        mt.name as meal_name,
+        t.transaction_time,
+        t.meal_remaining_after
+      FROM transactions t
+      JOIN users u ON t.user_id = u.id
+      JOIN vendors v ON t.vendor_id = v.id
+      JOIN meal_types mt ON t.meal_type_id = mt.id
+      ORDER BY t.transaction_time DESC
+      LIMIT 1000
+    `);
+
+    const doc = new PDFDocument({ margin: 40, size: 'A4' });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="live-feed-report.pdf"');
+    doc.pipe(res);
+
+    // Header
+    doc.fontSize(20).font('Helvetica-Bold').text('MEAL TICKETS SYSTEM', { align: 'center' });
+    doc.fontSize(12).font('Helvetica').text('Live Feed Transaction Report', { align: 'center' });
+    doc.moveDown();
+
+    const currentDate = new Date().toLocaleString();
+    doc.fontSize(10).font('Helvetica-Bold').text('Report Metadata:');
+    doc.font('Helvetica').text(`Generated: ${currentDate}`);
+    doc.text(`Total Transactions: ${transactions.length}`);
+    doc.moveDown();
+
+    // Summary Box
+    doc.rect(40, doc.y, 515, 40).fill('#f5f5f5');
+    doc.fillColor('#1a1a1a').font('Helvetica-Bold').text('Summary', 50, doc.y + 10);
+    doc.font('Helvetica').text(`Showing the last ${transactions.length} recent transactions from the legacy feed.`, 50, doc.y + 2);
+    doc.moveDown(2);
+
+    // Table Header
+    const startY = doc.y;
+    doc.rect(40, startY, 515, 20).fill('#1a1a1a');
+    doc.fillColor('#ffffff').fontSize(10).font('Helvetica-Bold');
+    doc.text('Time', 50, startY + 5);
+    doc.text('User', 150, startY + 5);
+    doc.text('Vendor', 300, startY + 5);
+    doc.text('Meal', 450, startY + 5);
+    doc.text('Rem.', 520, startY + 5);
+
+    let currentY = startY + 20;
+    doc.fillColor('#1a1a1a').font('Helvetica').fontSize(9);
+
+    transactions.forEach((tx, index) => {
+      // Add page if needed
+      if (currentY > 750) {
+        doc.addPage();
+        currentY = 40;
+        // Repeat Header
+        doc.rect(40, currentY, 515, 20).fill('#1a1a1a');
+        doc.fillColor('#ffffff').fontSize(10).font('Helvetica-Bold');
+        doc.text('Time', 50, currentY + 5);
+        doc.text('User', 150, currentY + 5);
+        doc.text('Vendor', 300, currentY + 5);
+        doc.text('Meal', 450, currentY + 5);
+        doc.text('Rem.', 520, currentY + 5);
+        currentY += 20;
+        doc.fillColor('#1a1a1a').font('Helvetica').fontSize(9);
+      }
+
+      // Zebra striping
+      if (index % 2 === 1) {
+        doc.rect(40, currentY, 515, 18).fill('#fafafa');
+        doc.fillColor('#1a1a1a');
+      }
+
+      const time = tx.transaction_time ? new Date(tx.transaction_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A';
+      doc.text(time, 50, currentY + 5);
+      doc.text(tx.user_name || 'N/A', 150, currentY + 5, { width: 140, ellipsis: true });
+      doc.text(tx.vendor_name || 'N/A', 300, currentY + 5, { width: 140, ellipsis: true });
+      doc.text(tx.meal_name || 'N/A', 450, currentY + 5);
+      doc.text(tx.meal_remaining_after?.toString() || '0', 520, currentY + 5);
+
+      currentY += 18;
+    });
+
+    doc.end();
+  } catch (err) {
+    console.error('Live feed PDF export error:', err);
+    res.status(500).json({ error: 'Failed to export PDF: ' + err.message });
+  }
+});
+
+
+/**
+ * GET /api/admin/events/:eventId/consumption-report
+ * Shows which users have consumed which meals at an event
+ */
+app.get('/api/admin/events/:eventId/consumption-report', authenticateSession, async (req, res) => {
+  try {
+    if (!req.session.admin_id) {
+      return res.status(403).json({ error: 'Not an admin session' });
+    }
+
+    const { eventId } = req.params;
+    const event = await dbGet('SELECT * FROM events WHERE id = ?', [eventId]);
+    if (!event) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+
+    // Get all registrations crossed with meal types and their consumptions
+    const report = await dbAll(`
+      SELECT 
+        er.id as registration_id,
+        er.user_id,
+        u.registration_number,
+        u.name as user_name,
+        mt.id as meal_type_id,
+        mt.name as meal_type_name,
+        mt.start_time,
+        CASE WHEN ec.id IS NOT NULL THEN 1 ELSE 0 END as consumed,
+        ec.id as consumption_id,
+        ec.consumed_at,
+        v.name as vendor_name
+      FROM event_registrations er
+      JOIN users u ON er.user_id = u.id
+      CROSS JOIN meal_types mt
+      LEFT JOIN event_consumptions ec ON 
+        er.event_id = ec.event_id AND 
+        er.user_id = ec.user_id AND 
+        mt.id = ec.meal_type_id
+      LEFT JOIN vendors v ON ec.vendor_id = v.id
+      WHERE er.event_id = ? AND mt.active = 1
+      ORDER BY u.name, mt.start_time
+    `, [eventId]);
+
+    // Summarize by meal type
+    const summary = await dbAll(`
+      SELECT 
+        mt.id,
+        mt.name,
+        mt.start_time,
+        COUNT(DISTINCT er.user_id) as total_registered,
+        COUNT(DISTINCT ec.user_id) as total_consumed,
+        COUNT(DISTINCT er.user_id) - COUNT(DISTINCT ec.user_id) as pending,
+        ROUND(100.0 * COUNT(DISTINCT ec.user_id) / COUNT(DISTINCT er.user_id), 1) as completion_percentage
+      FROM event_registrations er
+      JOIN meal_types mt ON mt.active = 1
+      LEFT JOIN event_consumptions ec ON 
+        er.event_id = ec.event_id AND 
+        mt.id = ec.meal_type_id AND
+        er.user_id = ec.user_id
+      WHERE er.event_id = ?
+      GROUP BY mt.id, mt.name, mt.start_time
+      ORDER BY mt.start_time
+    `, [eventId]);
+
+    res.json({
+      event,
+      summary,
+      detail: report,
+      totalRegistrations: report.length > 0 ? Math.max(...report.map(r => r.user_id).filter((v, i, a) => a.indexOf(v) === i).length) : 0,
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('Event consumption report error:', err);
+    res.status(500).json({ error: 'Failed to fetch event report' });
+  }
+});
+
+/**
+ * GET /api/admin/events/:eventId/live-feed
+ * Real-time transaction feed for an event
+ * Query params: offset, limit
+ */
+app.get('/api/admin/events/:eventId/live-feed', authenticateSession, async (req, res) => {
+  try {
+    if (!req.session.admin_id) {
+      return res.status(403).json({ error: 'Not an admin session' });
+    }
+
+    const { eventId } = req.params;
+    const { offset = '0', limit = '50' } = req.query;
+    const offsetNum = Math.max(0, parseInt(offset) || 0);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 50));
+
+    const event = await dbGet('SELECT * FROM events WHERE id = ?', [eventId]);
+    if (!event) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+
+    // Get paginated event consumptions
+    const feed = await dbAll(`
+      SELECT 
+        ec.id,
+        ec.consumed_at,
+        u.id as user_id,
+        u.name as user_name,
+        u.registration_number,
+        mt.id as meal_type_id,
+        mt.name as meal_type,
+        v.id as vendor_id,
+        v.name as vendor_name,
+        strftime('%H:%M:%S', ec.consumed_at) as consumption_time
+      FROM event_consumptions ec
+      JOIN users u ON ec.user_id = u.id
+      JOIN meal_types mt ON ec.meal_type_id = mt.id
+      LEFT JOIN vendors v ON ec.vendor_id = v.id
+      WHERE ec.event_id = ?
+      ORDER BY ec.consumed_at DESC
+      LIMIT ? OFFSET ?
+    `, [eventId, limitNum, offsetNum]);
+
+    // Get total count
+    const countResult = await dbGet(`
+      SELECT COUNT(*) as total FROM event_consumptions WHERE event_id = ?
+    `, [eventId]);
+
+    const totalCount = countResult?.total || 0;
+
+    res.json({
+      event,
+      feed,
+      pagination: {
+        offset: offsetNum,
+        limit: limitNum,
+        total: totalCount,
+        hasMore: (offsetNum + limitNum) < totalCount,
+        pages: Math.ceil(totalCount / limitNum)
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('Event live feed error:', err);
+    res.status(500).json({ error: 'Failed to fetch live feed' });
+  }
+});
+
+// ===== RATE LIMITING =====
+const requestCounts = new Map();
+const RATE_WINDOW_MS = 60000;
+const MAX_REQUESTS_PER_WINDOW = 500;
+const HEALTH_MAX_REQUESTS = 2000;
+
+const PUBLIC_ENDPOINTS = ['/api/health', '/api/auth/login', '/api/auth/register'];
+
+const rateLimit = (req, res, next) => {
+  const path = req.path || req.url;
+
+  if (PUBLIC_ENDPOINTS.some(p => path.startsWith(p))) {
+    if (path.includes('/api/health')) {
+      const ip = req.ip || req.connection.remoteAddress || 'unknown';
+      const now = Date.now();
+      const key = `health:${ip}`;
+
+      let record = requestCounts.get(key);
+      if (!record || now - record.windowStart > RATE_WINDOW_MS) {
+        record = { windowStart: now, count: 0 };
+        requestCounts.set(key, record);
+      }
+
+      record.count++;
+
+      if (record.count > HEALTH_MAX_REQUESTS) {
+        return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+      }
+    }
+    return next();
+  }
+
+  const ip = req.ip || req.connection.remoteAddress || 'unknown';
+  const now = Date.now();
+  const key = `${ip}:${path}`;
+
+  let record = requestCounts.get(key);
+  if (!record || now - record.windowStart > RATE_WINDOW_MS) {
+    record = { windowStart: now, count: 0 };
+    requestCounts.set(key, record);
+  }
+
+  record.count++;
+
+  if (record.count > MAX_REQUESTS_PER_WINDOW) {
+    return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+  }
+
+  next();
+};
+
+app.use(rateLimit);
+
+// ===== ERROR HANDLING & RESILIENCE =====
+
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({ error: 'Internal server error' });
+});
+
+setInterval(() => {
+  const now = Date.now();
+  const windowStart = now - 120000;
+  for (const [key, value] of requestCounts.entries()) {
+    if (value.windowStart < windowStart) {
+      requestCounts.delete(key);
+    }
+  }
+}, 60000);
+
+// ===== DATABASE OPTIMIZATIONS =====
+let dbConnected = false;
+
+function initDatabase() {
+  return new Promise((resolve, reject) => {
+    db.serialize(() => {
+      db.run("PRAGMA journal_mode=WAL", (err) => {
+        if (err) console.warn('WAL mode warning:', err);
+      });
+      db.run("PRAGMA synchronous=NORMAL", (err) => {
+        if (err) console.warn('Sync mode warning:', err);
+      });
+      db.run("PRAGMA busy_timeout=5000", (err) => {
+        if (err) console.warn('Busy timeout warning:', err);
+      });
+
+      dbConnected = true;
+      console.log('✅ Database initialized with optimizations');
+      resolve();
+    });
+  });
+}
+
+initDatabase().catch(err => {
+  console.error('Database initialization failed:', err);
+});
+
+// ===== ADMIN RECONCILIATION & SYNC ENDPOINTS =====
+
+/**
+ * GET /api/admin/reconciliation/validate
+ * Checks data consistency across all tables
+ * Returns discrepancies and warnings
+ */
+app.get('/api/admin/reconciliation/validate', authenticateSession, async (req, res) => {
+  try {
+    if (!req.session.admin_id) {
+      return res.status(403).json({ error: 'Not an admin session' });
+    }
+
+    const issues = [];
+
+    // Check 1: meal_allocations vs transactions discrepancies
+    const discrepancies = await dbAll(`
+      SELECT 
+        ma.user_id,
+        u.registration_number,
+        u.name,
+        ma.meal_type_id,
+        mt.name as meal_type_name,
+        ma.allocated,
+        ma.remaining,
+        COUNT(t.id) as actual_consumed,
+        ma.allocated - COUNT(t.id) as expected_remaining,
+        ABS((ma.allocated - COUNT(t.id)) - ma.remaining) as discrepancy
+      FROM meal_allocations ma
+      JOIN users u ON ma.user_id = u.id
+      JOIN meal_types mt ON ma.meal_type_id = mt.id
+      LEFT JOIN transactions t ON ma.user_id = t.user_id AND ma.meal_type_id = t.meal_type_id
+      GROUP BY ma.user_id, ma.meal_type_id, ma.allocated, ma.remaining
+      HAVING discrepancy > 0
+    `);
+
+    if (discrepancies.length > 0) {
+      issues.push({
+        severity: 'HIGH',
+        type: 'allocation_discrepancy',
+        count: discrepancies.length,
+        description: 'Remaining count does not match actual transactions',
+        details: discrepancies.slice(0, 10)
+      });
+    }
+
+    // Check 2: Event registrations vs consumptions
+    const unconfirmed = await dbAll(`
+      SELECT 
+        er.event_id,
+        e.name as event_name,
+        er.user_id,
+        u.registration_number,
+        u.name as user_name,
+        COUNT(ec.id) as meals_consumed,
+        (SELECT COUNT(*) FROM meal_types WHERE active = 1) as total_meal_types
+      FROM event_registrations er
+      JOIN events e ON er.event_id = e.id
+      JOIN users u ON er.user_id = u.id
+      LEFT JOIN event_consumptions ec ON er.event_id = ec.event_id AND er.user_id = ec.user_id
+      GROUP BY er.event_id, er.user_id
+      HAVING meals_consumed < (SELECT COUNT(*) FROM meal_types WHERE active = 1)
+      LIMIT 20
+    `);
+
+    if (unconfirmed.length > 0) {
+      issues.push({
+        severity: 'MEDIUM',
+        type: 'incomplete_event_consumptions',
+        count: unconfirmed.length,
+        description: 'Registered users who have not consumed all meal types',
+        details: unconfirmed.slice(0, 10)
+      });
+    }
+
+    // Check 3: Users without meal allocations
+    const unallocated = await dbAll(`
+      SELECT u.id, u.registration_number, u.name
+      FROM users u
+      WHERE u.active = 1
+      AND NOT EXISTS (SELECT 1 FROM meal_allocations WHERE user_id = u.id)
+      LIMIT 20
+    `);
+
+    if (unallocated.length > 0) {
+      issues.push({
+        severity: 'MEDIUM',
+        type: 'no_meal_allocations',
+        count: unallocated.length,
+        description: 'Active users without any meal allocations',
+        details: unallocated
+      });
+    }
+
+    // Check 4: Orphaned event consumptions
+    const orphaned = await dbAll(`
+      SELECT DISTINCT ec.event_id, ec.user_id, u.registration_number, u.name
+      FROM event_consumptions ec
+      JOIN users u ON ec.user_id = u.id
+      WHERE NOT EXISTS (
+        SELECT 1 FROM event_registrations 
+        WHERE event_id = ec.event_id AND user_id = ec.user_id
+      )
+      LIMIT 20
+    `);
+
+    if (orphaned.length > 0) {
+      issues.push({
+        severity: 'HIGH',
+        type: 'orphaned_consumptions',
+        count: orphaned.length,
+        description: 'Event consumptions for unregistered users',
+        details: orphaned
+      });
+    }
+
+    res.json({
+      timestamp: new Date().toISOString(),
+      isHealthy: issues.length === 0,
+      issueCount: issues.length,
+      issues
+    });
+  } catch (err) {
+    console.error('Reconciliation validation error:', err);
+    res.status(500).json({ error: 'Failed to validate system' });
+  }
+});
+
+/**
+ * POST /api/admin/sync/meal-allocations
+ * Recalculates all remaining meal counts from transactions
+ * Use only if discrepancies detected
+ */
+app.post('/api/admin/sync/meal-allocations', authenticateSession, async (req, res) => {
+  try {
+    if (!req.session.admin_id) {
+      return res.status(403).json({ error: 'Not an admin session' });
+    }
+
+    const allocations = await dbAll(`
+      SELECT DISTINCT ma.id, ma.user_id, ma.meal_type_id, ma.allocated 
+      FROM meal_allocations ma
+    `);
+
+    let updated = 0;
+    let errors = [];
+
+    for (const alloc of allocations) {
+      try {
+        const consumed = await dbGet(`
+          SELECT COUNT(*) as count FROM transactions 
+          WHERE user_id = ? AND meal_type_id = ?
+        `, [alloc.user_id, alloc.meal_type_id]);
+
+        const consumedCount = consumed?.count || 0;
+        const newRemaining = (alloc.allocated || 0) - consumedCount;
+
+        await dbRun(`
+          UPDATE meal_allocations 
+          SET remaining = ?, consumed_count = ?, updated_at = datetime('now')
+          WHERE id = ?
+        `, [newRemaining, consumedCount, alloc.id]);
+
+        updated++;
+      } catch (err) {
+        errors.push({
+          allocation_id: alloc.id,
+          user_id: alloc.user_id,
+          meal_type_id: alloc.meal_type_id,
+          error: err.message
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      updated,
+      totalAllocations: allocations.length,
+      errorCount: errors.length,
+      errors: errors.length > 0 ? errors : null,
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('Sync allocations error:', err);
+    res.status(500).json({ error: 'Failed to sync allocations' });
+  }
+});
+
+/**
+ * POST /api/admin/sync/event-consumptions
+ * Validates all event consumptions are properly recorded
+ */
+app.post('/api/admin/sync/event-consumptions', authenticateSession, async (req, res) => {
+  try {
+    if (!req.session.admin_id) {
+      return res.status(403).json({ error: 'Not an admin session' });
+    }
+
+    const { eventId } = req.body;
+    if (!eventId) {
+      return res.status(400).json({ error: 'eventId required' });
+    }
+
+    const event = await dbGet('SELECT * FROM events WHERE id = ?', [eventId]);
+    if (!event) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+
+    const missingTokens = await dbAll(`
+      SELECT er.user_id, u.registration_number, u.name
+      FROM event_registrations er
+      JOIN users u ON er.user_id = u.id
+      WHERE er.event_id = ?
+      AND NOT EXISTS (
+        SELECT 1 FROM event_qr_tokens 
+        WHERE event_id = ? AND user_id = er.user_id
+      )
+      LIMIT 20
+    `, [eventId, eventId]);
+
+    const orphanedConsumptions = await dbAll(`
+      SELECT DISTINCT ec.user_id, u.registration_number, u.name
+      FROM event_consumptions ec
+      JOIN users u ON ec.user_id = u.id
+      WHERE ec.event_id = ?
+      AND NOT EXISTS (
+        SELECT 1 FROM event_registrations 
+        WHERE event_id = ? AND user_id = ec.user_id
+      )
+      LIMIT 20
+    `, [eventId, eventId]);
+
+    res.json({
+      event,
+      validation: {
+        missingQRTokens: missingTokens.length,
+        missingTokensDetail: missingTokens.length > 0 ? missingTokens : null,
+        orphanedConsumptions: orphanedConsumptions.length,
+        orphanedDetail: orphanedConsumptions.length > 0 ? orphanedConsumptions : null,
+        isValid: missingTokens.length === 0 && orphanedConsumptions.length === 0
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('Event sync validation error:', err);
+    res.status(500).json({ error: 'Failed to validate event' });
+  }
+});
+
 // ===== HEALTH CHECK =====
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    database: dbConnected ? 'connected' : 'disconnected'
+  });
+});
+
+// Global error handlers
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
 // ===== START SERVER =====
