@@ -23,8 +23,11 @@ app.use(express.static('public'));
 
 // Database
 const db = new sqlite3.Database(process.env.DB_PATH || './meal_system.db', (err) => {
-  if (err) console.error('Database error:', err);
-  else console.log('✅ Connected to database');
+  if (err) {
+    console.error('Database error:', err);
+  } else {
+    console.log('✅ Connected to database');
+  }
 });
 
 // Promisify database operations
@@ -383,7 +386,7 @@ app.get('/api/user/dashboard', authenticateSession, async (req, res) => {
 
     const user = await dbGet('SELECT * FROM users WHERE id = ?', [req.session.user_id]);
 
-    // Get meals with accurate remaining count (calculated from transactions)
+    // Get meals with accurate remaining count (calculated from transactions + event_consumptions)
     const meals = await dbAll(`
       SELECT 
         mt.id, 
@@ -392,15 +395,19 @@ app.get('/api/user/dashboard', authenticateSession, async (req, res) => {
         mt.end_time,
         ma.id as allocation_id,
         COALESCE(ma.allocated, 0) as allocated,
-        COALESCE(ma.allocated - COUNT(t.id), COALESCE(ma.allocated, 0)) as remaining,
-        COUNT(t.id) as consumed
+        (COALESCE(ma.allocated, 0) - (
+          COALESCE((SELECT COUNT(*) FROM transactions t WHERE t.user_id = ? AND t.meal_type_id = mt.id), 0) +
+          COALESCE((SELECT COUNT(*) FROM event_consumptions ec WHERE ec.user_id = ? AND ec.meal_type_id = mt.id), 0)
+        )) as remaining,
+        (
+          COALESCE((SELECT COUNT(*) FROM transactions t WHERE t.user_id = ? AND t.meal_type_id = mt.id), 0) +
+          COALESCE((SELECT COUNT(*) FROM event_consumptions ec WHERE ec.user_id = ? AND ec.meal_type_id = mt.id), 0)
+        ) as consumed
       FROM meal_types mt
       LEFT JOIN meal_allocations ma ON mt.id = ma.meal_type_id AND ma.user_id = ?
-      LEFT JOIN transactions t ON ma.user_id = t.user_id AND mt.id = t.meal_type_id
       WHERE mt.active = 1
-      GROUP BY mt.id, mt.name, mt.start_time, mt.end_time, ma.id, ma.allocated
       ORDER BY mt.start_time
-    `, [req.session.user_id]);
+    `, [req.session.user_id, req.session.user_id, req.session.user_id, req.session.user_id, req.session.user_id]);
 
     // Find active meal using new time utility
     const activeMeal = findActiveMeal(meals) || null;
@@ -559,15 +566,16 @@ app.post('/api/vendor/validate-qr', authenticateSession, async (req, res) => {
       return res.status(400).json({ error: 'QR data required' });
     }
 
+    console.log(`🔍 Processing Scan: [${qrData}] (MealType: ${mealTypeId})`);
+
     // Event mode: EVT:{eventId}|REG:{regNum}|TOKEN:{token}
-    const evtMatch = qrData.match(/EVT:([A-Za-z0-9_-]+)\s*\|\s*REG:([A-Za-z0-9_-]+)\s*\|\s*TOKEN:([A-Za-z0-9]+)/i);
+    const evtMatch = qrData.match(/EVT:([A-Za-z0-9_-]+).*REG:([A-Za-z0-9_-]+).*TOKEN:([A-Za-z0-9]+)/i);
     if (evtMatch) {
       const [, eventId, regNum, tokenStr] = evtMatch;
       return await handleEventValidation(req, res, { eventId, regNum, tokenStr, mealTypeId });
     }
 
     // Legacy mode: REG:{regNum}|TOKEN:{token}
-    // Fixed: Allow - and _ in registration numbers, and make robust for token chars
     const regMatch = qrData.match(/REG:([A-Za-z0-9_\-]+)/i);
     const tokenMatch = qrData.match(/TOKEN:([A-Za-z0-9]+)/i);
 
@@ -589,6 +597,7 @@ app.post('/api/vendor/validate-qr', authenticateSession, async (req, res) => {
     if (!user) {
       return res.status(400).json({
         status: 'denied',
+        error: 'User Not Found',
         message: 'User Not Found'
       });
     }
@@ -596,6 +605,7 @@ app.post('/api/vendor/validate-qr', authenticateSession, async (req, res) => {
     if (!user.active) {
       return res.status(400).json({
         status: 'denied',
+        error: 'Account Suspended',
         message: 'Account Suspended'
       });
     }
@@ -726,16 +736,24 @@ async function handleEventValidation(req, res, { eventId, regNum, tokenStr, meal
     [eventId, user.id, tokenStr]
   );
   if (!eventToken) {
-    return res.status(400).json({ status: 'denied', message: 'Invalid Event QR Token' });
+    return res.status(400).json({
+      status: 'denied',
+      error: 'Invalid Event Token',
+      message: 'Invalid Event QR Token'
+    });
   }
 
-  // Check total meal limit (Max 3)
+  // Check total meal limit (Max 10)
   const currentConsumptions = await dbAll(
     `SELECT id FROM event_consumptions WHERE event_id = ? AND user_id = ?`,
     [eventId, user.id]
   );
-  if (currentConsumptions.length >= 3) {
-    return res.status(400).json({ status: 'denied', message: 'Event Meal Limit Reached (Max 3)' });
+  if (currentConsumptions.length >= 10) {
+    return res.status(400).json({
+      status: 'denied',
+      error: 'Event Meal Limit Reached',
+      message: 'Event Meal Limit Reached (Max 10)'
+    });
   }
 
   let mealType;
@@ -743,27 +761,25 @@ async function handleEventValidation(req, res, { eventId, regNum, tokenStr, meal
     mealType = await dbGet('SELECT * FROM meal_types WHERE id = ? AND active = 1', [mealTypeId]);
   }
   if (!mealType) {
-    const currentTime = `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`;
-    mealType = await dbGet(
-      `SELECT * FROM meal_types WHERE ? >= start_time AND ? < end_time AND active = 1`,
-      [currentTime, currentTime]
-    );
+    // Attempt real-time detection first
+    const allMealTypes = await dbAll('SELECT * FROM meal_types WHERE active = 1');
+    mealType = findActiveMeal(allMealTypes);
+
+    // Fallback: If no strict time match, pick the NEXT upcoming or most recent meal 
+    // to prevent vendor frustration during transitions
+    if (!mealType && allMealTypes.length > 0) {
+      // Sort by distance to current time if needed, but for now just pick the first available
+      // active meal type to allow redemption
+      mealType = allMealTypes[0];
+    }
   }
   if (!mealType) {
-    return res.status(400).json({ status: 'denied', message: 'Please select a meal type' });
+    return res.status(400).json({ status: 'denied', message: 'No active meal types configured' });
   }
 
-  const alreadyConsumed = await dbGet(
-    `SELECT id FROM event_consumptions
-     WHERE event_id = ? AND user_id = ? AND meal_type_id = ?`,
-    [eventId, user.id, mealType.id]
-  );
-  if (alreadyConsumed) {
-    return res.status(400).json({
-      status: 'denied',
-      message: `Already redeemed ${mealType.name} for this event`
-    });
-  }
+  // Removed: Check for already consumed meal type.
+  // We now allow users to redeem multiple of the same meal type (e.g. Breakfast on Day 1 and Day 2)
+  // as long as they haven't reached their total limit (currently 10).
 
   const consumptionId = generateId();
   await dbRun(
@@ -776,7 +792,7 @@ async function handleEventValidation(req, res, { eventId, regNum, tokenStr, meal
     `SELECT meal_type_id FROM event_consumptions WHERE event_id = ? AND user_id = ?`,
     [eventId, user.id]
   );
-  const remainingCount = 3 - consumptions.length;
+  const remainingCount = 10 - consumptions.length;
 
   res.json({
     status: 'approved',
@@ -787,6 +803,50 @@ async function handleEventValidation(req, res, { eventId, regNum, tokenStr, meal
 }
 
 // ===== ADMIN ROUTES =====
+
+/**
+ * POST /api/admin/fix-database
+ * Emergency database repair to allow multi-day redemptions
+ */
+app.post('/api/admin/fix-database', authenticateSession, async (req, res) => {
+  try {
+    if (!req.session.admin_id) {
+      return res.status(403).json({ error: 'Not an admin session' });
+    }
+
+    db.serialize(() => {
+      console.log('🛠️ Manual database repair triggered...');
+      db.run("CREATE TABLE IF NOT EXISTS event_consumptions_backup AS SELECT * FROM event_consumptions");
+      db.run("DROP TABLE IF EXISTS event_consumptions");
+      db.run(`
+        CREATE TABLE event_consumptions (
+          id TEXT PRIMARY KEY,
+          event_id TEXT NOT NULL,
+          user_id TEXT NOT NULL,
+          meal_type_id TEXT NOT NULL,
+          consumed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          vendor_id TEXT,
+          FOREIGN KEY (event_id) REFERENCES events(id),
+          FOREIGN KEY (user_id) REFERENCES users(id),
+          FOREIGN KEY (meal_type_id) REFERENCES meal_types(id),
+          FOREIGN KEY (vendor_id) REFERENCES vendors(id)
+        )
+      `);
+      db.run("INSERT OR IGNORE INTO event_consumptions SELECT * FROM event_consumptions_backup");
+      db.run("DROP TABLE IF EXISTS event_consumptions_backup");
+
+      // Also ensure all users have 10 meals
+      db.run("UPDATE meal_allocations SET allocated = 10, remaining = 10");
+
+      console.log('✅ Manual repair complete.');
+    });
+
+    res.json({ success: true, message: 'Database constraint removed. Multi-day meals now allowed.' });
+  } catch (err) {
+    console.error('Repair failed:', err);
+    res.status(500).json({ error: 'Repair failed: ' + err.message });
+  }
+});
 
 /**
  * GET /api/admin/dashboard
@@ -1813,17 +1873,24 @@ app.post('/api/admin/allocate-meals', authenticateSession, async (req, res) => {
 
     const { userIds, mealTypeId, amount, operation } = req.body;
 
-    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
-      return res.status(400).json({ error: 'userIds array required' });
+    let targetUserIds = [];
+    if (userIds === 'all') {
+      const allUsers = await dbAll('SELECT id FROM users WHERE active = 1');
+      targetUserIds = allUsers.map(u => u.id);
+    } else if (Array.isArray(userIds)) {
+      targetUserIds = userIds;
+    } else {
+      return res.status(400).json({ error: 'userIds array or "all" required' });
     }
 
-    if (!mealTypeId) {
-      return res.status(400).json({ error: 'mealTypeId required' });
-    }
-
-    const mealType = await dbGet('SELECT id, name FROM meal_types WHERE id = ?', [mealTypeId]);
-    if (!mealType) {
-      return res.status(400).json({ error: 'Invalid meal type' });
+    let targetMealTypeIds = [];
+    if (mealTypeId === 'all') {
+      const allMeals = await dbAll('SELECT id FROM meal_types WHERE active = 1');
+      targetMealTypeIds = allMeals.map(m => m.id);
+    } else if (mealTypeId) {
+      targetMealTypeIds = [mealTypeId];
+    } else {
+      return res.status(400).json({ error: 'mealTypeId or "all" required' });
     }
 
     const validOperations = ['add', 'set', 'reset'];
@@ -1833,68 +1900,51 @@ app.post('/api/admin/allocate-meals', authenticateSession, async (req, res) => {
     let updated = 0;
     let errors = [];
 
-    for (const userId of userIds) {
-      try {
-        const user = await dbGet('SELECT id FROM users WHERE id = ?', [userId]);
-        if (!user) {
-          errors.push({ userId, error: 'User not found' });
-          continue;
-        }
-
-        let allocation = await dbGet(
-          'SELECT id, allocated, remaining FROM meal_allocations WHERE user_id = ? AND meal_type_id = ?',
-          [userId, mealTypeId]
-        );
-
-        if (!allocation) {
-          const newId = generateId();
-          if (op === 'set') {
-            await dbRun(
-              `INSERT INTO meal_allocations (id, user_id, meal_type_id, allocated, remaining)
-               VALUES (?, ?, ?, ?, ?)`,
-              [newId, userId, mealTypeId, allocAmount, allocAmount]
-            );
-          } else if (op === 'reset') {
-            await dbRun(
-              `INSERT INTO meal_allocations (id, user_id, meal_type_id, allocated, remaining)
-               VALUES (?, ?, ?, 20, 20)`,
-              [newId, userId, mealTypeId]
-            );
-          } else {
-            await dbRun(
-              `INSERT INTO meal_allocations (id, user_id, meal_type_id, allocated, remaining)
-               VALUES (?, ?, ?, ?, ?)`,
-              [newId, userId, mealTypeId, allocAmount, allocAmount]
-            );
-          }
-          updated++;
-        } else {
-          let newAllocated, newRemaining;
-          if (op === 'add') {
-            newAllocated = allocation.allocated + allocAmount;
-            newRemaining = allocation.remaining + allocAmount;
-          } else if (op === 'set') {
-            newAllocated = allocAmount;
-            newRemaining = Math.min(allocAmount, allocation.remaining + (allocAmount - allocation.allocated));
-          } else {
-            newAllocated = 20;
-            newRemaining = 20;
-          }
-
-          await dbRun(
-            `UPDATE meal_allocations SET allocated = ?, remaining = ?, updated_at = datetime('now') WHERE id = ?`,
-            [newAllocated, newRemaining, allocation.id]
+    for (const userId of targetUserIds) {
+      for (const mId of targetMealTypeIds) {
+        try {
+          let allocation = await dbGet(
+            'SELECT id, allocated, remaining FROM meal_allocations WHERE user_id = ? AND meal_type_id = ?',
+            [userId, mId]
           );
-          updated++;
+
+          if (!allocation) {
+            const newId = generateId();
+            const val = op === 'reset' ? 20 : allocAmount;
+            await dbRun(
+              `INSERT INTO meal_allocations (id, user_id, meal_type_id, allocated, remaining)
+               VALUES (?, ?, ?, ?, ?)`,
+              [newId, userId, mId, val, val]
+            );
+            updated++;
+          } else {
+            let newAllocated, newRemaining;
+            if (op === 'add') {
+              newAllocated = allocation.allocated + allocAmount;
+              newRemaining = allocation.remaining + allocAmount;
+            } else if (op === 'set') {
+              newAllocated = allocAmount;
+              newRemaining = allocAmount; // Force sync to the new total
+            } else {
+              newAllocated = 20;
+              newRemaining = 20;
+            }
+
+            await dbRun(
+              `UPDATE meal_allocations SET allocated = ?, remaining = ?, updated_at = datetime("now") WHERE id = ?`,
+              [newAllocated, newRemaining, allocation.id]
+            );
+            updated++;
+          }
+        } catch (err) {
+          errors.push({ userId, mealTypeId: mId, error: err.message });
         }
-      } catch (err) {
-        errors.push({ userId, error: err.message });
       }
     }
 
     res.json({
       success: true,
-      message: `Updated ${updated} user allocations for ${mealType.name}`,
+      message: `Updated ${updated} allocation records.`,
       updated,
       errors: errors.length > 0 ? errors : undefined
     });
@@ -2449,11 +2499,7 @@ app.get('/api/admin/live-feed/export-pdf', authenticateSession, async (req, res)
     doc.text(`Total Transactions: ${transactions.length}`);
     doc.moveDown();
 
-    // Summary Box
-    doc.rect(40, doc.y, 515, 40).fill('#f5f5f5');
-    doc.fillColor('#1a1a1a').font('Helvetica-Bold').text('Summary', 50, doc.y + 10);
-    doc.font('Helvetica').text(`Showing the last ${transactions.length} recent transactions from the legacy feed.`, 50, doc.y + 2);
-    doc.moveDown(2);
+    doc.moveDown();
 
     // Table Header
     const startY = doc.y;

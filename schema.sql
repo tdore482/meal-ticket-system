@@ -146,7 +146,6 @@ CREATE TABLE IF NOT EXISTS event_consumptions (
   meal_type_id TEXT NOT NULL,
   consumed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   vendor_id TEXT,
-  UNIQUE(event_id, user_id, meal_type_id),
   FOREIGN KEY (event_id) REFERENCES events(id),
   FOREIGN KEY (user_id) REFERENCES users(id),
   FOREIGN KEY (meal_type_id) REFERENCES meal_types(id),
