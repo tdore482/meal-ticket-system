@@ -32,9 +32,9 @@ The meal-ticket system has critical issues preventing accurate dashboard updates
 
 **Root Causes:**
 1. **Separate Tracking Tables:**
-   - Legacy: `meal_allocations` (user → meal_type_id) + `transactions` (meal_type_id)
-   - Event: `event_consumptions` (user → meal_type_id → event_id)
-   - NO relationship between the two systems
+ - Legacy: `meal_allocations` (user → meal_type_id) + `transactions` (meal_type_id)
+ - Event: `event_consumptions` (user → meal_type_id → event_id)
+ - NO relationship between the two systems
 
 2. **No Duplicate Prevention Across Modes** — A user could consume the same meal in both legacy and event modes
 
@@ -76,9 +76,9 @@ The meal-ticket system has critical issues preventing accurate dashboard updates
    ```javascript
    const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
    const activeMeal = meals.find(m => currentTime >= m.start_time && currentTime < m.end_time);
-   ```
-   - Fails at exact boundary times (e.g., 12:00:00 when start_time = "12:00")
-   - Seconds are ignored, causing false negatives at millisecond precision
+ ```
+ - Fails at exact boundary times (e.g., 12:00:00 when start_time = "12:00")
+ - Seconds are ignored, causing false negatives at millisecond precision
 
 2. **No Timezone Handling** — Times stored as TEXT (HH:MM) with no timezone info
 3. **Meal Period Overlap Not Detected** — Multiple active meals can exist simultaneously
@@ -851,14 +851,14 @@ curl -X GET http://localhost:3000/api/admin/dashboard \
 
 ## Success Criteria
 
-✅ **All dashboards show real-time data within 5 seconds of transaction**
-✅ **No allocation discrepancies between remaining and transactions**
-✅ **Event mode and legacy mode both visible in daily breakdowns**
-✅ **Admin can view complete event consumption reports**
-✅ **Live feed shows all transactions with pagination**
-✅ **Reconciliation endpoint identifies and flags any issues**
-✅ **Sync endpoints successfully correct discrepancies**
-✅ **Time window detection is accurate within 1 second**
+ **All dashboards show real-time data within 5 seconds of transaction**
+ **No allocation discrepancies between remaining and transactions**
+ **Event mode and legacy mode both visible in daily breakdowns**
+ **Admin can view complete event consumption reports**
+ **Live feed shows all transactions with pagination**
+ **Reconciliation endpoint identifies and flags any issues**
+ **Sync endpoints successfully correct discrepancies**
+ **Time window detection is accurate within 1 second**
 
 ---
 

@@ -25,27 +25,27 @@ The meal-ticket management system has critical data integrity issues preventing 
 
 ## Solutions Provided
 
-### **Document 1: MEAL_TRACKING_DIAGNOSTIC_PROMPT.md**
+### **Document 1: system-analysis.md**
 - **Length:** ~400 lines
 - **Contents:**
-  - Detailed problem analysis for each of the 8 issues
-  - Root cause breakdown with code references
-  - 5-phase implementation plan
-  - SQL migration instructions
-  - Complete JavaScript code for new endpoints
-  - Reconciliation logic and validation procedures
-  - Testing criteria and troubleshooting guide
+ - Detailed problem analysis for each of the 8 issues
+ - Root cause breakdown with code references
+ - 5-phase implementation plan
+ - SQL migration instructions
+ - Complete JavaScript code for new endpoints
+ - Reconciliation logic and validation procedures
+ - Testing criteria and troubleshooting guide
 
-### **Document 2: IMPLEMENTATION_GUIDE_AND_PATCHES.md**
+### **Document 2: implementation-guide.md**
 - **Length:** ~500 lines
 - **Contents:**
-  - 10 ready-to-use code patches
-  - Utility functions for time calculation
-  - Drop-in replacements for all dashboard endpoints
-  - 4 new event-mode endpoints with pagination
-  - 3 data validation/sync endpoints
-  - Testing commands (curl)
-  - Deployment and rollback procedures
+ - 10 ready-to-use code patches
+ - Utility functions for time calculation
+ - Drop-in replacements for all dashboard endpoints
+ - 4 new event-mode endpoints with pagination
+ - 3 data validation/sync endpoints
+ - Testing commands (curl)
+ - Deployment and rollback procedures
 
 ---
 
@@ -72,7 +72,7 @@ grep -n "app.get('/api/user/dashboard'" server.js
 
 ### **Phase 3: Backend API (60 minutes)**
 ```javascript
-// Add 10 code patches from IMPLEMENTATION_GUIDE_AND_PATCHES.md:
+// Add 10 code patches from implementation-guide.md:
 // 1. Utility functions (timeStringToSeconds, isTimeInRange, etc.)
 // 2. Updated user dashboard
 // 3. Updated vendor dashboard
@@ -109,21 +109,21 @@ POST /api/admin/sync/meal-allocations
 ## Key Improvements
 
 ### **Before**
-❌ Dashboards show outdated allocation data
-❌ No pagination for transaction history (stuck at 20)
-❌ Event and legacy modes invisible to each other
-❌ No way to verify data consistency
-❌ Active meal detection unreliable
-❌ No event-specific reporting
+ Dashboards show outdated allocation data
+ No pagination for transaction history (stuck at 20)
+ Event and legacy modes invisible to each other
+ No way to verify data consistency
+ Active meal detection unreliable
+ No event-specific reporting
 
 ### **After**
-✅ Real-time accurate dashboards (within 5 seconds of transaction)
-✅ Paginated transaction feeds (50+ items, with filters)
-✅ Unified reporting across both modes
-✅ Automated reconciliation & validation endpoints
-✅ Robust time-based meal detection
-✅ Full event consumption visibility & live feeds
-✅ Automatic sync to fix discrepancies
+ Real-time accurate dashboards (within 5 seconds of transaction)
+ Paginated transaction feeds (50+ items, with filters)
+ Unified reporting across both modes
+ Automated reconciliation & validation endpoints
+ Robust time-based meal detection
+ Full event consumption visibility & live feeds
+ Automatic sync to fix discrepancies
 
 ---
 
@@ -255,32 +255,32 @@ echo "Load test completed"
 After deployment, monitor:
 
 1. **Dashboard Response Time**
-   - Should be < 500ms
-   - Alert if > 1s
+ - Should be < 500ms
+ - Alert if > 1s
 
 2. **Reconciliation Status**
-   - Run `/api/admin/reconciliation/validate` every 5 minutes
-   - Alert if `issueCount > 0`
+ - Run `/api/admin/reconciliation/validate` every 5 minutes
+ - Alert if `issueCount > 0`
 
 3. **Data Consistency**
-   - Query count of discrepancies
+ - Query count of discrepancies
    ```sql
    SELECT COUNT(*) FROM meal_allocations ma
    WHERE ma.remaining != (ma.allocated - 
      (SELECT COUNT(*) FROM transactions WHERE user_id = ma.user_id 
       AND meal_type_id = ma.meal_type_id));
-   ```
-   - Alert if count > 0
+ ```
+ - Alert if count > 0
 
 4. **Event Completion**
-   - Monitor pending consumptions
+ - Monitor pending consumptions
    ```sql
    SELECT event_id, COUNT(*) pending FROM (
      SELECT er.event_id, er.user_id FROM event_registrations er
      WHERE NOT EXISTS (SELECT 1 FROM event_consumptions ec 
        WHERE ec.event_id = er.event_id AND ec.user_id = er.user_id)
    ) GROUP BY event_id;
-   ```
+ ```
 
 ---
 
@@ -313,8 +313,8 @@ A: Check `/api/admin/sync/event-consumptions?eventId=EVENT_ID`. Will show missin
 
 | Document | Purpose | Read Time |
 |----------|---------|-----------|
-| `MEAL_TRACKING_DIAGNOSTIC_PROMPT.md` | Full problem analysis & solutions | 25-30 min |
-| `IMPLEMENTATION_GUIDE_AND_PATCHES.md` | Code patches & deployment | 20-25 min |
+| `system-analysis.md` | Full problem analysis & solutions | 25-30 min |
+| `implementation-guide.md` | Code patches & deployment | 20-25 min |
 | This document | Quick reference & FAQ | 10 min |
 
 ---
@@ -367,20 +367,20 @@ A: Check `/api/admin/sync/event-consumptions?eventId=EVENT_ID`. Will show missin
 After implementation, verify:
 
 ```
-✅ User dashboard loads in < 200ms
-✅ Remaining meals match transaction count
-✅ Pagination works with 100+ transactions
-✅ Event live feed updates in real-time
-✅ Reconciliation returns: { isHealthy: true }
-✅ Daily breakdown includes both modes
-✅ No allocation discrepancies detected
-✅ Time-based meal detection is accurate
+ User dashboard loads in < 200ms
+ Remaining meals match transaction count
+ Pagination works with 100+ transactions
+ Event live feed updates in real-time
+ Reconciliation returns: { isHealthy: true }
+ Daily breakdown includes both modes
+ No allocation discrepancies detected
+ Time-based meal detection is accurate
 ```
 
 If all above are true, system is fully operational and data-consistent.
 
 ---
 
-**For detailed implementation instructions, refer to `IMPLEMENTATION_GUIDE_AND_PATCHES.md`**
+**For detailed implementation instructions, refer to `implementation-guide.md`**
 
-**For in-depth problem analysis, refer to `MEAL_TRACKING_DIAGNOSTIC_PROMPT.md`**
+**For in-depth problem analysis, refer to `system-analysis.md`**
