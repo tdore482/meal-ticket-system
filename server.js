@@ -3137,27 +3137,13 @@ app.post('/api/admin/users/bulk-import', authenticateSession, async (req, res) =
 // ===== HEALTH CHECK =====
 
 app.get('/api/health', async (req, res) => {
-  let dbStatus = dbConnected ? 'connected' : 'disconnected';
-  let dbError = null;
   if (!dbConnected) {
-    try {
-      await initDatabase();
-      dbStatus = dbConnected ? 'connected' : 'disconnected';
-    } catch (e) {
-      dbError = e.message;
-    }
+    try { await initDatabase(); } catch (e) { /* retry */ }
   }
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    database: dbStatus,
-    ...(dbError && { error: dbError }),
-    env: {
-      PGHOST: process.env.PGHOST ? 'set' : 'missing',
-      PGUSER: process.env.PGUSER ? 'set' : 'missing',
-      PGPASSWORD: process.env.PGPASSWORD ? 'set' : 'missing',
-      DATABASE_URL: process.env.DATABASE_URL ? 'set' : 'missing',
-    }
+    database: dbConnected ? 'connected' : 'disconnected'
   });
 });
 
