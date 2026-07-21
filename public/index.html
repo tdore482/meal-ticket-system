@@ -98,6 +98,9 @@
       background: rgba(198, 40, 40, 0.06);
     }
 
+    #adminNavTabs::-webkit-scrollbar { height: 0; }
+    #adminNavTabs { scrollbar-width: none; }
+
     .admin-page {
       animation: fadeIn 0.3s ease;
     }
@@ -1856,6 +1859,7 @@
         tab.classList.remove('active');
         if (tab.dataset.page === pageName) {
           tab.classList.add('active');
+          tab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
         }
       });
 
