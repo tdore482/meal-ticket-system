@@ -1001,6 +1001,10 @@
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/></svg>
             Matrix Report
           </button>
+          <button onclick="showAdminPage('meal-schedule')" class="admin-tab" data-page="meal-schedule">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Meal Schedule
+          </button>
         </div>
       </div>
 
@@ -1367,6 +1371,25 @@
             <div id="dailyMatrixContainer" style="overflow-x: auto;">
               <div class="loading">Select dates and click Load...</div>
             </div>
+          </div>
+        </div>
+
+        <!-- Meal Schedule Page -->
+        <div id="admin-page-meal-schedule" class="admin-page hidden">
+          <div class="dashboard-card">
+            <div class="section-header">
+              <div class="section-header-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              </div>
+              <h3 class="section-title" style="margin:0; font-size:22px;">Meal Schedule</h3>
+            </div>
+            <p style="font-size:12px; color:var(--text-muted); margin-bottom:20px;">Edit meal period names and time windows. Changes take effect immediately for QR validation and vendor scanning.</p>
+
+            <div id="mealScheduleContainer" style="display:grid; gap:16px;">
+              <div class="loading">Loading meal types...</div>
+            </div>
+
+            <div id="mealScheduleResult" style="margin-top:16px;"></div>
           </div>
         </div>
       </div>
@@ -1858,6 +1881,79 @@
         renderConsolidatedReport();
       } else if (pageName === 'daily-matrix-report') {
         loadDailyMatrixReport();
+      } else if (pageName === 'meal-schedule') {
+        loadMealSchedule();
+      }
+    }
+
+    async function loadMealSchedule() {
+      const container = document.getElementById('mealScheduleContainer');
+      container.innerHTML = '<div class="loading">Loading meal types...</div>';
+      try {
+        const mealTypes = await apiCall('/admin/meal-types');
+        if (!mealTypes || mealTypes.length === 0) {
+          container.innerHTML = '<p style="color:var(--text-muted);">No meal types configured.</p>';
+          return;
+        }
+        let html = '';
+        mealTypes.forEach(mt => {
+          const isActive = mt.active === 1;
+          html += `
+          <div style="background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 16px; align-items: end;">
+            <div>
+              <label style="font-size:10px; text-transform:uppercase; font-weight:700; color:var(--text-muted); display:block; margin-bottom:4px;">Meal Name</label>
+              <input type="text" id="mt_name_${mt.id}" value="${mt.name}" style="width:100%; padding:10px; border:1px solid #d1d5db; border-radius:4px; font-size:14px; font-weight:600;">
+            </div>
+            <div>
+              <label style="font-size:10px; text-transform:uppercase; font-weight:700; color:var(--text-muted); display:block; margin-bottom:4px;">Start Time</label>
+              <input type="time" id="mt_start_${mt.id}" value="${mt.start_time}" style="width:100%; padding:10px; border:1px solid #d1d5db; border-radius:4px; font-size:14px;">
+            </div>
+            <div>
+              <label style="font-size:10px; text-transform:uppercase; font-weight:700; color:var(--text-muted); display:block; margin-bottom:4px;">End Time</label>
+              <input type="time" id="mt_end_${mt.id}" value="${mt.end_time}" style="width:100%; padding:10px; border:1px solid #d1d5db; border-radius:4px; font-size:14px;">
+            </div>
+            <div style="display:flex; gap:8px; align-items:center; padding-bottom:2px;">
+              <label style="font-size:12px; font-weight:600; color:var(--text-main); cursor:pointer; display:flex; align-items:center; gap:6px;">
+                <input type="checkbox" id="mt_active_${mt.id}" ${isActive ? 'checked' : ''} style="width:16px; height:16px;">
+                Active
+              </label>
+              <button onclick="saveMealType('${mt.id}')" style="background:var(--success); color:white; padding:10px 20px; border:none; border-radius:4px; font-weight:700; cursor:pointer; font-size:13px; white-space:nowrap;">Save</button>
+            </div>
+          </div>`;
+        });
+        container.innerHTML = html;
+      } catch (err) {
+        container.innerHTML = `<p style="color:var(--error);">Error loading meal types: ${err.message}</p>`;
+      }
+    }
+
+    async function saveMealType(id) {
+      const resultDiv = document.getElementById('mealScheduleResult');
+      const name = document.getElementById(`mt_name_${id}`).value.trim();
+      const startTime = document.getElementById(`mt_start_${id}`).value;
+      const endTime = document.getElementById(`mt_end_${id}`).value;
+      const active = document.getElementById(`mt_active_${id}`).checked;
+
+      if (!name) {
+        resultDiv.innerHTML = '<p style="color:var(--error);">Meal name cannot be empty.</p>';
+        return;
+      }
+      if (!startTime || !endTime) {
+        resultDiv.innerHTML = '<p style="color:var(--error);">Start and end times are required.</p>';
+        return;
+      }
+      if (startTime >= endTime) {
+        resultDiv.innerHTML = '<p style="color:var(--error);">Start time must be before end time.</p>';
+        return;
+      }
+
+      try {
+        resultDiv.innerHTML = '<p style="color:var(--text-muted);">Saving...</p>';
+        await apiCall(`/admin/meal-types/${id}`, 'PUT', { name, startTime, endTime, active });
+        resultDiv.innerHTML = `<p style="color:var(--success);">Meal type "${name}" updated successfully.</p>`;
+        setTimeout(() => { resultDiv.innerHTML = ''; }, 3000);
+      } catch (err) {
+        resultDiv.innerHTML = `<p style="color:var(--error);">Error: ${err.message}</p>`;
       }
     }
 

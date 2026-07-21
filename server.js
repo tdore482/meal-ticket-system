@@ -3194,6 +3194,69 @@ app.post('/api/admin/users/bulk-import', authenticateSession, async (req, res) =
   }
 });
 
+// ===== MEAL TYPE MANAGEMENT =====
+
+/**
+ * GET /api/admin/meal-types
+ * List all meal types
+ */
+app.get('/api/admin/meal-types', authenticateSession, async (req, res) => {
+  try {
+    if (!req.session.admin_id) {
+      return res.status(403).json({ error: 'Not an admin session' });
+    }
+    const mealTypes = await dbAll('SELECT * FROM meal_types ORDER BY start_time');
+    res.json(mealTypes);
+  } catch (err) {
+    console.error('Get meal types error:', err);
+    res.status(500).json({ error: 'Failed to fetch meal types' });
+  }
+});
+
+/**
+ * PUT /api/admin/meal-types/:id
+ * Update a meal type's name, start_time, end_time, active
+ */
+app.put('/api/admin/meal-types/:id', authenticateSession, async (req, res) => {
+  try {
+    if (!req.session.admin_id) {
+      return res.status(403).json({ error: 'Not an admin session' });
+    }
+
+    const { name, startTime, endTime, active } = req.body;
+    const mealType = await dbGet('SELECT * FROM meal_types WHERE id = ?', [req.params.id]);
+    if (!mealType) {
+      return res.status(404).json({ error: 'Meal type not found' });
+    }
+
+    // Validate times
+    const timeRegex = /^([01]\d|2[0-3]):[0-5]\d$/;
+    if (startTime && !timeRegex.test(startTime)) {
+      return res.status(400).json({ error: 'Invalid start time format (use HH:MM)' });
+    }
+    if (endTime && !timeRegex.test(endTime)) {
+      return res.status(400).json({ error: 'Invalid end time format (use HH:MM)' });
+    }
+
+    await dbRun(
+      `UPDATE meal_types SET name = ?, start_time = ?, end_time = ?, active = ? WHERE id = ?`,
+      [
+        name || mealType.name,
+        startTime || mealType.start_time,
+        endTime || mealType.end_time,
+        active !== undefined ? (active ? 1 : 0) : mealType.active,
+        req.params.id
+      ]
+    );
+
+    const updated = await dbGet('SELECT * FROM meal_types WHERE id = ?', [req.params.id]);
+    res.json({ success: true, mealType: updated });
+  } catch (err) {
+    console.error('Update meal type error:', err);
+    res.status(500).json({ error: 'Failed to update meal type' });
+  }
+});
+
 // ===== HEALTH CHECK =====
 
 app.get('/api/health', async (req, res) => {
