@@ -67,8 +67,8 @@
       background: transparent;
       border: none;
       color: #6b7280;
-      padding: 14px 20px;
-      font-size: 13px;
+      padding: 12px 14px;
+      font-size: 12px;
       font-weight: 600;
       cursor: pointer;
       transition: all 0.2s ease;
@@ -76,14 +76,14 @@
       white-space: nowrap;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       font-family: 'Inter', 'Manrope', sans-serif;
       letter-spacing: 0.3px;
     }
 
     .admin-tab svg {
-      width: 16px;
-      height: 16px;
+      width: 14px;
+      height: 14px;
       flex-shrink: 0;
     }
 
@@ -100,6 +100,26 @@
 
     #adminNavTabs::-webkit-scrollbar { height: 0; }
     #adminNavTabs { scrollbar-width: none; }
+
+    .tab-scroll-hint {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: 60px;
+      background: linear-gradient(to right, transparent, var(--dark-bg));
+      pointer-events: none;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding-right: 8px;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .tab-scroll-hint.visible { opacity: 1; }
+    .tab-scroll-hint svg { width: 18px; height: 18px; color: #999; animation: pulseRight 1.5s infinite; }
+    @keyframes pulseRight { 0%,100%{ transform: translateX(0); } 50%{ transform: translateX(4px); } }
 
     .admin-page {
       animation: fadeIn 0.3s ease;
@@ -978,8 +998,8 @@
 
     <div id="adminDashboard" class="hidden">
       <!-- Admin Navigation Tabs -->
-      <div style="background: var(--dark-bg); padding: 0; margin-bottom: 24px; border-radius: 8px;">
-        <div style="display: flex; gap: 0; overflow-x: auto;" id="adminNavTabs">
+      <div style="background: var(--dark-bg); padding: 0; margin-bottom: 24px; border-radius: 8px; position: relative;">
+        <div style="display: flex; gap: 0; overflow-x: auto;" id="adminNavTabs" onscroll="updateTabScrollHint()">
           <button onclick="showAdminPage('daily-summary')" class="admin-tab active" data-page="daily-summary">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
             Daily Summary
@@ -1008,6 +1028,9 @@
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
             Meal Schedule
           </button>
+        </div>
+        <div class="tab-scroll-hint visible" id="tabScrollHint">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
         </div>
       </div>
 
@@ -1852,6 +1875,15 @@
     // Admin Page Navigation
     let currentAdminPage = 'daily-summary';
 
+    function updateTabScrollHint() {
+      const tabs = document.getElementById('adminNavTabs');
+      const hint = document.getElementById('tabScrollHint');
+      if (!tabs || !hint) return;
+      const atEnd = tabs.scrollLeft + tabs.clientWidth >= tabs.scrollWidth - 10;
+      hint.classList.toggle('visible', !atEnd);
+    }
+    window.addEventListener('load', updateTabScrollHint);
+
     function showAdminPage(pageName) {
       currentAdminPage = pageName;
 
@@ -1860,6 +1892,7 @@
         if (tab.dataset.page === pageName) {
           tab.classList.add('active');
           tab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+          setTimeout(updateTabScrollHint, 350);
         }
       });
 
