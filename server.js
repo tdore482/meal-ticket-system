@@ -150,6 +150,9 @@ app.post('/api/auth/register', async (req, res) => {
     const rawName = req.body.name;
     const rawRegNum = req.body.registrationNumber;
     const rawPin = req.body.pin;
+    const accommodation = (req.body.accommodation || 'Y').toString().trim().toUpperCase();
+    const isAccom = accommodation === 'Y';
+    const mealAllocation = isAccom ? 12 : 4;
 
     if (!rawName || !rawRegNum || !rawPin) {
       return res.status(400).json({ error: 'All fields are required' });
@@ -182,9 +185,9 @@ app.post('/api/auth/register', async (req, res) => {
     const pinHash = await hashPassword(pin);
 
     await dbRun(
-      `INSERT INTO users (id, registration_number, name, pin_hash, active)
-       VALUES (?, ?, ?, ?, 1)`,
-      [userId, registrationNumber, name, pinHash]
+      `INSERT INTO users (id, registration_number, name, pin_hash, accommodation, active)
+       VALUES (?, ?, ?, ?, ?, 1)`,
+      [userId, registrationNumber, name, pinHash, accommodation]
     );
 
     const mealTypes = await dbAll('SELECT id FROM meal_types WHERE active = 1');
@@ -193,8 +196,8 @@ app.post('/api/auth/register', async (req, res) => {
       const allocId = generateId();
       await dbRun(
         `INSERT INTO meal_allocations (id, user_id, meal_type_id, allocated, remaining)
-         VALUES (?, ?, ?, 20, 20)`,
-        [allocId, userId, mealType.id]
+         VALUES (?, ?, ?, ?, ?)`,
+        [allocId, userId, mealType.id, mealAllocation, mealAllocation]
       );
     }
 
@@ -702,16 +705,18 @@ async function handleEventValidation(req, res, { eventId, regNum, tokenStr, meal
     });
   }
 
-  // Check total meal limit (Max 10)
+  // Check total meal limit based on accommodation (Y=12, N=4)
+  const userInfo = await dbGet('SELECT accommodation FROM users WHERE id = ?', [user.id]);
+  const mealLimit = (userInfo && userInfo.accommodation === 'N') ? 4 : 12;
   const currentConsumptions = await dbAll(
     `SELECT id FROM event_consumptions WHERE event_id = ? AND user_id = ?`,
     [eventId, user.id]
   );
-  if (currentConsumptions.length >= 10) {
+  if (currentConsumptions.length >= mealLimit) {
     return res.status(400).json({
       status: 'denied',
       error: 'Event Meal Limit Reached',
-      message: 'Event Meal Limit Reached (Max 10)'
+      message: `Event Meal Limit Reached (Max ${mealLimit})`
     });
   }
 
@@ -1864,7 +1869,9 @@ app.post('/api/admin/allocate-meals', authenticateSession, async (req, res) => {
 
           if (!allocation) {
             const newId = generateId();
-            const val = op === 'reset' ? 20 : allocAmount;
+            const userAccom = await dbGet('SELECT accommodation FROM users WHERE id = ?', [userId]);
+            const resetVal = (userAccom && userAccom.accommodation === 'N') ? 4 : 12;
+            const val = op === 'reset' ? resetVal : allocAmount;
             await dbRun(
               `INSERT INTO meal_allocations (id, user_id, meal_type_id, allocated, remaining)
                VALUES (?, ?, ?, ?, ?)`,
@@ -1880,8 +1887,10 @@ app.post('/api/admin/allocate-meals', authenticateSession, async (req, res) => {
               newAllocated = allocAmount;
               newRemaining = allocAmount; // Force sync to the new total
             } else {
-              newAllocated = 20;
-              newRemaining = 20;
+              const userAccom = await dbGet('SELECT accommodation FROM users WHERE id = ?', [userId]);
+              const resetVal = (userAccom && userAccom.accommodation === 'N') ? 4 : 12;
+              newAllocated = resetVal;
+              newRemaining = resetVal;
             }
 
             await dbRun(
@@ -1951,10 +1960,12 @@ app.post('/api/admin/allocate-meals/all', authenticateSession, async (req, res) 
             [newId, user.id, mealTypeId, allocAmount, allocAmount]
           );
         } else if (op === 'reset') {
+          const userAccom = await dbGet('SELECT accommodation FROM users WHERE id = ?', [user.id]);
+          const resetVal = (userAccom && userAccom.accommodation === 'N') ? 4 : 12;
           await dbRun(
             `INSERT INTO meal_allocations (id, user_id, meal_type_id, allocated, remaining)
-             VALUES (?, ?, ?, 20, 20)`,
-            [newId, user.id, mealTypeId]
+             VALUES (?, ?, ?, ?, ?)`,
+            [newId, user.id, mealTypeId, resetVal, resetVal]
           );
         } else {
           await dbRun(
@@ -1973,8 +1984,10 @@ app.post('/api/admin/allocate-meals/all', authenticateSession, async (req, res) 
           newAllocated = allocAmount;
           newRemaining = Math.min(allocAmount, allocation.remaining + (allocAmount - allocation.allocated));
         } else {
-          newAllocated = 20;
-          newRemaining = 20;
+          const userAccom = await dbGet('SELECT accommodation FROM users WHERE id = ?', [user.id]);
+          const resetVal = (userAccom && userAccom.accommodation === 'N') ? 4 : 12;
+          newAllocated = resetVal;
+          newRemaining = resetVal;
         }
 
         await dbRun(
@@ -2012,6 +2025,7 @@ app.get('/api/admin/users', authenticateSession, async (req, res) => {
         u.registration_number,
         u.name,
         u.active,
+        u.accommodation,
         (SELECT token FROM qr_tokens WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1) as latest_token,
         (SELECT expires_at FROM qr_tokens WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1) as token_expiry
        FROM users u
@@ -2036,7 +2050,7 @@ app.get('/api/admin/users/:userId', authenticateSession, async (req, res) => {
     }
 
     const user = await dbGet(
-      'SELECT id, registration_number, name, active FROM users WHERE id = ?',
+      'SELECT id, registration_number, name, active, accommodation FROM users WHERE id = ?',
       [req.params.userId]
     );
 
@@ -2056,6 +2070,51 @@ app.get('/api/admin/users/:userId', authenticateSession, async (req, res) => {
     res.json({ ...user, meals });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch user details' });
+  }
+});
+
+/**
+ * POST /api/admin/users/:userId/accommodation
+ * Update user accommodation status and reset meal allocations accordingly
+ */
+app.post('/api/admin/users/:userId/accommodation', authenticateSession, async (req, res) => {
+  try {
+    if (!req.session.admin_id) {
+      return res.status(403).json({ error: 'Not an admin session' });
+    }
+
+    const { accommodation } = req.body;
+    const accommod = (accommodation || 'Y').toString().trim().toUpperCase();
+    if (!['Y', 'N'].includes(accommod)) {
+      return res.status(400).json({ error: 'Accommodation must be Y or N' });
+    }
+
+    const user = await dbGet('SELECT id, accommodation FROM users WHERE id = ?', [req.params.userId]);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    await dbRun('UPDATE users SET accommodation = ?, updated_at = NOW() WHERE id = ?', [accommod, user.id]);
+
+    // Reset all meal allocations to match new accommodation
+    const newAlloc = accommod === 'Y' ? 12 : 4;
+    const allocations = await dbAll('SELECT id, remaining FROM meal_allocations WHERE user_id = ?', [user.id]);
+    for (const alloc of allocations) {
+      const consumed = alloc.remaining;
+      // Keep consumed count: newRemaining = newAlloc - (oldAlloc - remaining)
+      // But we don't track oldAlloc easily, so just set remaining to newAlloc (reset consumed)
+      await dbRun('UPDATE meal_allocations SET allocated = ?, remaining = ?, updated_at = NOW() WHERE id = ?', [newAlloc, newAlloc, alloc.id]);
+    }
+
+    res.json({
+      success: true,
+      message: `Accommodation set to ${accommod}. Allocations reset to ${newAlloc} per meal type.`,
+      accommodation: accommod,
+      mealAllocation: newAlloc
+    });
+  } catch (err) {
+    console.error('Update accommodation error:', err);
+    res.status(500).json({ error: 'Failed to update accommodation' });
   }
 });
 
@@ -3083,10 +3142,10 @@ app.post('/api/admin/users/bulk-import', authenticateSession, async (req, res) =
           const userId = generateId();
 
           await dbRun(
-            `INSERT INTO users (id, registration_number, name, pin_hash, active)
-             VALUES (?, ?, ?, ?, 1)
+            `INSERT INTO users (id, registration_number, name, pin_hash, accommodation, active)
+             VALUES (?, ?, ?, ?, ?, 1)
              ON CONFLICT (registration_number) DO NOTHING`,
-            [userId, u.registrationNumber, u.name, u.pinHash]
+            [userId, u.registrationNumber, u.name, u.pinHash, u.accommodation || 'Y']
           );
 
           // Check if insert actually happened (ON CONFLICT may silently skip)
@@ -3099,13 +3158,14 @@ app.post('/api/admin/users/bulk-import', authenticateSession, async (req, res) =
           existingRegNums.add(u.registrationNumber);
 
           if (createAllocations && mealTypes.length > 0) {
-            // Batch insert allocations
+            // Batch insert allocations - Y=12, N=4
+            const mealAllocation = (u.accommodation === 'N') ? 4 : 12;
             for (const mt of mealTypes) {
               const allocId = generateId();
               await dbRun(
                 `INSERT INTO meal_allocations (id, user_id, meal_type_id, allocated, remaining)
-                 VALUES (?, ?, ?, 20, 20)`,
-                [allocId, userId, mt.id]
+                 VALUES (?, ?, ?, ?, ?)`,
+                [allocId, userId, mt.id, mealAllocation, mealAllocation]
               );
             }
           }

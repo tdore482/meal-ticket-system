@@ -47,19 +47,19 @@ async function importUsers() {
         const pinHash = await bcrypt.hash(pin, 10);
 
         await dbRun(
-          `INSERT INTO users (id, registration_number, name, pin_hash, active)
-           VALUES (?, ?, ?, ?, 1)
+          `INSERT INTO users (id, registration_number, name, pin_hash, accommodation, active)
+           VALUES (?, ?, ?, ?, 'Y', 1)
            ON CONFLICT (registration_number) DO NOTHING`,
           [id, registrationNumber, name, pinHash]
         );
 
-        // Create meal allocations for the user
+        // Create meal allocations for the user (Y=12 meals per type)
         const mealTypes = await dbAll('SELECT id FROM meal_types WHERE active = 1');
         for (const mt of mealTypes) {
           const allocId = generateId();
           await dbRun(
             `INSERT INTO meal_allocations (id, user_id, meal_type_id, allocated, remaining)
-             VALUES (?, ?, ?, 20, 20)`,
+             VALUES (?, ?, ?, 12, 12)`,
             [allocId, id, mt.id]
           );
         }

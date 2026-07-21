@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
   registration_number TEXT UNIQUE NOT NULL,
   name TEXT NOT NULL,
   pin_hash TEXT NOT NULL,
+  accommodation TEXT NOT NULL DEFAULT 'Y',
   active INTEGER DEFAULT 1,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()

@@ -89,6 +89,11 @@ const COLUMN_PATTERNS = {
   role: [
     /^role$/i, /^position$/i, /^title$/i, /^job.?title$/i, /^designation$/i,
   ],
+  accommodation: [
+    /^accommodation$/i, /^accom$/i, /^resid(en)?ce$/i, /^boarding$/i,
+    /^stay$/i, /^lodging$/i, /^residential$/i, /^hostel$/i, /^housed?$/i,
+    /^accommodation.?status$/i, /^accom.?flag$/i,
+  ],
 };
 
 /**
@@ -140,6 +145,17 @@ function normalizeUser(record) {
   let regNum = (record.registrationNumber || '').trim().toUpperCase().replace(/\s+/g, '');
   let pin = (record.pin || '').trim();
 
+  // Normalize accommodation: default to 'Y', accept Y/N/Yes/No/1/0
+  let accommodation = 'Y';
+  if (record.accommodation !== undefined && record.accommodation !== null && String(record.accommodation).trim() !== '') {
+    const val = String(record.accommodation).trim().toUpperCase();
+    if (['N', 'NO', '0', 'FALSE', 'NONE'].includes(val)) {
+      accommodation = 'N';
+    } else {
+      accommodation = 'Y';
+    }
+  }
+
   // Validate: name must have at least 2 chars
   if (name.length < 2) return null;
 
@@ -159,7 +175,7 @@ function normalizeUser(record) {
     pin = generatePIN();
   }
 
-  return { name, registrationNumber: regNum, pin };
+  return { name, registrationNumber: regNum, pin, accommodation };
 }
 
 /**
@@ -297,6 +313,7 @@ function parseUserFile(content) {
     if (fieldMap.phone !== undefined) record.phone = cols[fieldMap.phone] || '';
     if (fieldMap.department !== undefined) record.department = cols[fieldMap.department] || '';
     if (fieldMap.role !== undefined) record.role = cols[fieldMap.role] || '';
+    if (fieldMap.accommodation !== undefined) record.accommodation = cols[fieldMap.accommodation] || '';
 
     // Also try: if name is empty, check if any column looks like a full name
     if (!record.name) {

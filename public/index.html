@@ -1119,6 +1119,7 @@
                     </th>
                     <th>Registration #</th>
                     <th>Name</th>
+                    <th>Accommodation</th>
                     <th>Status</th>
                     <th>Generated Token</th>
                     <th>Token Expiry</th>
@@ -1127,7 +1128,7 @@
                 </thead>
                 <tbody id="usersTableBody">
                   <tr>
-                    <td colspan="7" class="loading">Loading users...</td>
+                    <td colspan="8" class="loading">Loading users...</td>
                   </tr>
                 </tbody>
               </table>
@@ -1176,7 +1177,7 @@
                   style="width:100%; padding:10px; border:1px solid #d1d5db; background:white;">
                   <option value="add">Add Meals</option>
                   <option value="set">Set Meals</option>
-                  <option value="reset">Reset to Default (20)</option>
+                  <option value="reset">Reset to Default (Y=12 / N=4)</option>
                 </select>
               </div>
               <div style="flex:1; min-width:200px;">
@@ -2128,6 +2129,12 @@
           <td><input type="checkbox" class="user-checkbox" value="${user.id}" onchange="toggleUserSelection('${user.id}')"></td>
           <td>${user.registration_number}</td>
           <td>${user.name}</td>
+          <td>
+            <select onchange="updateAccommodation('${user.id}', this.value)" style="padding:4px 8px; border:1px solid #d1d5db; border-radius:4px; font-size:12px; font-weight:600; background:${user.accommodation === 'Y' ? '#dcfce7' : '#fef3c7'}; color:${user.accommodation === 'Y' ? '#166534' : '#92400e'};">
+              <option value="Y" ${user.accommodation === 'Y' ? 'selected' : ''}>Y (12 meals)</option>
+              <option value="N" ${user.accommodation === 'N' ? 'selected' : ''}>N (4 meals)</option>
+            </select>
+          </td>
           <td>${statusBadge}</td>
           <td><code style="background: #f3f4f6; padding: 4px 8px; border-radius: 4px; font-size: 12px;">${user.latest_token || '-'}</code></td>
           <td>${tokenExpiry}</td>
@@ -2139,10 +2146,10 @@
       `;
         });
 
-        document.getElementById('usersTableBody').innerHTML = html || '<tr><td colspan="7" style="text-align:center; padding:20px;">No users found</td></tr>';
+        document.getElementById('usersTableBody').innerHTML = html || '<tr><td colspan="8" style="text-align:center; padding:20px;">No users found</td></tr>';
       } catch (err) {
         console.error('Error loading users:', err);
-        document.getElementById('usersTableBody').innerHTML = '<tr><td colspan="7" style="text-align:center; padding:20px;">Error loading users</td></tr>';
+        document.getElementById('usersTableBody').innerHTML = '<tr><td colspan="8" style="text-align:center; padding:20px;">Error loading users</td></tr>';
       }
     }
 
@@ -2152,6 +2159,15 @@
         selectedUserIds.splice(idx, 1);
       } else {
         selectedUserIds.push(userId);
+      }
+    }
+
+    async function updateAccommodation(userId, value) {
+      try {
+        await apiCall(`/admin/users/${userId}/accommodation`, 'POST', { accommodation: value });
+        loadUsersTable();
+      } catch (err) {
+        alert('Failed to update accommodation: ' + err.message);
       }
     }
 
@@ -2172,6 +2188,7 @@
         const user = await apiCall(`/admin/users/${userId}`);
         let details = `User: ${user.name}\n`;
         details += `Registration: ${user.registration_number}\n`;
+        details += `Accommodation: ${user.accommodation === 'Y' ? 'Yes (12 meals/type)' : 'No (4 meals/type)'}\n`;
         details += `Status: ${user.active ? 'Active' : 'Inactive'}\n\n`;
         details += `Meal Allocations:\n`;
         user.meals.forEach(meal => {
@@ -2198,7 +2215,7 @@
       <div style="background: #fff; padding: 16px; border-left: 4px solid var(--primary); box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
         <p style="font-size: 12px; text-transform:uppercase; color: #6b7280;">Editing meal allocation for:</p>
         <p style="font-size: 20px; font-weight: 700; color: var(--text-main); font-family: 'Anton', sans-serif;">${user.name}</p>
-        <p style="font-size: 12px; color: #6b7280; margin-top: 4px;">Registration: ${user.registration_number}</p>
+        <p style="font-size: 12px; color: #6b7280; margin-top: 4px;">Registration: ${user.registration_number} | Accommodation: ${user.accommodation === 'Y' ? 'Yes (12/type)' : 'No (4/type)'}</p>
       </div>
     `;
 
@@ -2886,17 +2903,17 @@
 
     async function syncAllUserMeals() {
       const resDiv = document.getElementById('maintenanceResult');
-      if (!confirm('This will RESET ALL active users to a 10/10 meal balance. Existing redemptions will are NOT deleted, but the remaining count will become 10. Continue?')) return;
+      if (!confirm('This will RESET ALL active users to their default meal balance (Y=12, N=4). Existing redemptions will NOT be deleted, but remaining counts will be reset. Continue?')) return;
 
       try {
         resDiv.innerHTML = '<span style="color:var(--text-muted)">Synchronizing meal balances...</span>';
         const r = await apiCall('/admin/allocate-meals', 'POST', {
           userIds: 'all',
-          amount: 10,
-          operation: 'set',
-          mealTypeId: 'all' // We'll handle 'all' in backend or loop here
+          amount: 0,
+          operation: 'reset',
+          mealTypeId: 'all'
         });
-        resDiv.innerHTML = `<span style="color:var(--success)">✅ All active users updated to 10/10 balance.</span>`;
+        resDiv.innerHTML = `<span style="color:var(--success)">✅ All active users reset to default balance (Y=12, N=4).</span>`;
         alert('Sync Successful!');
       } catch (err) {
         resDiv.innerHTML = `<span style="color:var(--error)">❌ Sync Failed: ${err.message}</span>`;
