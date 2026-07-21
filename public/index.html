@@ -5,6 +5,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Meal Ticket System</title>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
@@ -63,6 +66,11 @@
     }
 
     /* Admin Navigation Tabs */
+    #adminNavTabs {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 0;
+    }
     .admin-tab {
       background: transparent;
       border: none;
@@ -76,9 +84,12 @@
       white-space: nowrap;
       display: flex;
       align-items: center;
+      justify-content: center;
       gap: 6px;
       font-family: 'Inter', 'Manrope', sans-serif;
       letter-spacing: 0.3px;
+      text-align: center;
+      width: 100%;
     }
 
     .admin-tab svg {
@@ -97,9 +108,6 @@
       border-bottom-color: var(--primary);
       background: rgba(198, 40, 40, 0.06);
     }
-
-    #adminNavTabs::-webkit-scrollbar { height: 0; }
-    #adminNavTabs { scrollbar-width: none; }
 
     .admin-page {
       animation: fadeIn 0.3s ease;
@@ -978,8 +986,8 @@
 
     <div id="adminDashboard" class="hidden">
       <!-- Admin Navigation Tabs -->
-      <div style="background: var(--dark-bg); padding: 4px 0; margin-bottom: 24px; border-radius: 8px;">
-        <div style="display: flex; flex-wrap: wrap; gap: 0;" id="adminNavTabs">
+      <div style="background: var(--dark-bg); padding: 0; margin-bottom: 24px; border-radius: 0;">
+        <div id="adminNavTabs">
           <button onclick="showAdminPage('daily-summary')" class="admin-tab active" data-page="daily-summary">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
             Daily Summary
