@@ -1083,6 +1083,30 @@
             <h3 class="section-title" style="font-size:24px;">User Database</h3>
             <p style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">Manage participant records, IDs, and
               PINs. Select users using checkboxes for bulk meal allocation below.</p>
+
+            <!-- CSV/Spreadsheet Import -->
+            <div id="importSection" style="margin-bottom:20px;">
+              <div id="importDropZone"
+                style="border:2px dashed var(--border); border-radius:8px; padding:24px; text-align:center; cursor:pointer; transition:all 0.2s; background:var(--card-bg);"
+                ondragover="event.preventDefault(); this.style.borderColor='var(--primary)'; this.style.background='rgba(198,40,40,0.04)'"
+                ondragleave="this.style.borderColor='var(--border)'; this.style.background='var(--card-bg)'"
+                ondrop="event.preventDefault(); this.style.borderColor='var(--border)'; this.style.background='var(--card-bg)'; handleFileDrop(event)"
+                onclick="document.getElementById('importFileInput').click()">
+                <input type="file" id="importFileInput" accept=".csv,.tsv,.txt,.xls,.xlsx" style="display:none" onchange="handleFileSelect(event)">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5" style="margin-bottom:8px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <p style="font-size:14px; color:var(--text-main); font-weight:600; margin-bottom:4px;">Drop CSV, TSV, or TXT file here</p>
+                <p style="font-size:11px; color:var(--text-muted);">Auto-detects: CSV, TSV, pipe-delimited, Excel export, or "Name: X | ID: Y | PIN: Z"</p>
+              </div>
+              <div id="importPreview" class="hidden" style="margin-top:12px; padding:16px; background:var(--card-bg); border-radius:8px; border:1px solid var(--border);">
+                <div id="importPreviewContent"></div>
+                <div style="display:flex; gap:8px; margin-top:12px; justify-content:flex-end;">
+                  <button onclick="cancelImport()" style="background:#e5e7eb; color:var(--text-main); padding:8px 20px; border:none; cursor:pointer; font-weight:600; border-radius:4px; font-size:13px;">Cancel</button>
+                  <button onclick="confirmImport()" id="confirmImportBtn" style="background:var(--success); color:white; padding:8px 20px; border:none; cursor:pointer; font-weight:600; border-radius:4px; font-size:13px;">Import Users</button>
+                </div>
+              </div>
+              <div id="importResult" class="hidden" style="margin-top:12px; padding:12px; border-radius:8px; font-size:13px;"></div>
+            </div>
+
             <div class="search-input-wrap">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
               <input type="text" id="userDbSearch" oninput="filterUserTable()" placeholder="Search by name or registration number...">
@@ -1994,6 +2018,99 @@
         }
       } catch (err) {
         console.error('Admin dashboard refresh error:', err);
+      }
+    }
+
+    // ===== CSV/SPREADSHEET IMPORT =====
+    let pendingImportContent = '';
+
+    function handleFileDrop(event) {
+      const file = event.dataTransfer.files[0];
+      if (file) readImportFile(file);
+    }
+
+    function handleFileSelect(event) {
+      const file = event.target.files[0];
+      if (file) readImportFile(file);
+      event.target.value = '';
+    }
+
+    function readImportFile(file) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        pendingImportContent = e.target.result;
+        const lines = pendingImportContent.split('\n').filter(l => l.trim());
+        const preview = lines.slice(0, 5).join('\n');
+        const more = lines.length > 5 ? `\n... and ${lines.length - 5} more rows` : '';
+
+        document.getElementById('importPreview').classList.remove('hidden');
+        document.getElementById('importPreviewContent').innerHTML = `
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+            <strong style="font-size:14px;">${file.name}</strong>
+            <span style="font-size:11px; color:var(--text-muted);">(${lines.length} rows detected)</span>
+          </div>
+          <pre style="background:#1a1a1a; color:#e0e0e0; padding:12px; border-radius:4px; font-size:11px; overflow-x:auto; max-height:150px; white-space:pre-wrap;">${escapeHtml(preview)}${escapeHtml(more)}</pre>
+        `;
+      };
+      reader.readAsText(file);
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function cancelImport() {
+      pendingImportContent = '';
+      document.getElementById('importPreview').classList.add('hidden');
+      document.getElementById('importResult').classList.add('hidden');
+    }
+
+    async function confirmImport() {
+      if (!pendingImportContent) return;
+      const btn = document.getElementById('confirmImportBtn');
+      btn.disabled = true;
+      btn.textContent = 'Importing...';
+      btn.style.opacity = '0.6';
+
+      try {
+        const res = await fetch('/api/admin/users/bulk-import', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + sessionToken,
+          },
+          body: JSON.stringify({ text: pendingImportContent, allocateMeals: true }),
+        });
+        const data = await res.json();
+
+        const resultEl = document.getElementById('importResult');
+        resultEl.classList.remove('hidden');
+        if (data.success) {
+          resultEl.style.background = '#dcfce7';
+          resultEl.style.color = '#166534';
+          let msg = `<strong>Import complete!</strong> ${data.imported} users imported`;
+          if (data.skipped > 0) msg += `, ${data.skipped} skipped`;
+          if (data.parseStats) msg += `<br><span style="font-size:11px;">Format detected: ${data.parseStats.headersFound ? 'Column headers found' : 'Positional/data-only'}</span>`;
+          resultEl.innerHTML = msg;
+          loadUsersTable();
+        } else {
+          resultEl.style.background = '#fef2f2';
+          resultEl.style.color = '#991b1b';
+          resultEl.innerHTML = `<strong>Import failed:</strong> ${data.error || 'Unknown error'}`;
+        }
+      } catch (err) {
+        const resultEl = document.getElementById('importResult');
+        resultEl.classList.remove('hidden');
+        resultEl.style.background = '#fef2f2';
+        resultEl.style.color = '#991b1b';
+        resultEl.innerHTML = `<strong>Error:</strong> ${err.message}`;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Import Users';
+        btn.style.opacity = '1';
+        pendingImportContent = '';
+        setTimeout(() => { document.getElementById('importPreview').classList.add('hidden'); }, 3000);
       }
     }
 

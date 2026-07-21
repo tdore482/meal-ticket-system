@@ -1,11 +1,10 @@
 /**
  * Meal Ticket Management System - Backend API
- * Express.js + SQLite
- * Run: npm install && npm run init-db && npm start
+ * Express.js + PostgreSQL (Supabase)
+ * Run: npm install && node setup-db.js && npm start
  */
 
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 const cors = require('cors');
@@ -13,50 +12,15 @@ const PDFDocument = require('pdfkit');
 const QRCode = require('qrcode');
 require('dotenv').config();
 
+const { dbRun, dbGet, dbAll, getClient, closePool } = require('./db');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 app.use(express.static('public'));
-
-// Database
-const db = new sqlite3.Database(process.env.DB_PATH || './meal_system.db', (err) => {
-  if (err) {
-    console.error('Database error:', err);
-  } else {
-    console.log('✅ Connected to database');
-  }
-});
-
-// Promisify database operations
-const dbRun = (sql, params = []) => {
-  return new Promise((resolve, reject) => {
-    db.run(sql, params, function (err) {
-      if (err) reject(err);
-      else resolve(this);
-    });
-  });
-};
-
-const dbGet = (sql, params = []) => {
-  return new Promise((resolve, reject) => {
-    db.get(sql, params, (err, row) => {
-      if (err) reject(err);
-      else resolve(row);
-    });
-  });
-};
-
-const dbAll = (sql, params = []) => {
-  return new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => {
-      if (err) reject(err);
-      else resolve(rows || []);
-    });
-  });
-};
 
 // Input Sanitization & Validation
 const sanitizeString = (str, maxLen = 100) => {
@@ -161,7 +125,7 @@ const authenticateSession = async (req, res, next) => {
   try {
     const session = await dbGet(
       `SELECT * FROM sessions 
-       WHERE session_token = ? AND expires_at > datetime('now')`,
+       WHERE session_token = ? AND expires_at > NOW()`,
       [token]
     );
 
@@ -616,7 +580,7 @@ app.post('/api/vendor/validate-qr', authenticateSession, async (req, res) => {
        WHERE user_id = ? 
        AND UPPER(TRIM(token)) = UPPER(TRIM(?)) 
        AND used = 0
-       AND expires_at > datetime('now')`,
+       AND expires_at > NOW()`,
       [user.id, tokenStr]
     );
 
@@ -663,30 +627,25 @@ app.post('/api/vendor/validate-qr', authenticateSession, async (req, res) => {
     const txDate = new Date().toISOString().split('T')[0];
 
     try {
-      await new Promise((resolve, reject) => {
-        db.serialize(() => {
-          db.run('UPDATE qr_tokens SET used = 1 WHERE id = ?', [qrToken.id], (err) => {
-            if (err) { reject(err); return; }
-
-            db.run(
-              'UPDATE meal_allocations SET remaining = ?, updated_at = datetime("now") WHERE id = ?',
-              [newRemaining, allocation.id],
-              (err) => {
-                if (err) { reject(err); return; }
-
-                db.run(
-                  'INSERT INTO transactions (id, user_id, vendor_id, meal_type_id, qr_token_id, meal_remaining_after, transaction_date, transaction_time) VALUES (?, ?, ?, ?, ?, ?, ?, datetime("now"))',
-                  [txId, user.id, req.session.vendor_id, activeMeal.id, qrToken.id, newRemaining, txDate],
-                  (err) => {
-                    if (err) { reject(err); return; }
-                    resolve();
-                  }
-                );
-              }
-            );
-          });
-        });
-      });
+      const client = await getClient();
+      try {
+        await client.query('BEGIN');
+        await client.query('UPDATE qr_tokens SET used = 1 WHERE id = $1', [qrToken.id]);
+        await client.query(
+          'UPDATE meal_allocations SET remaining = $1, updated_at = NOW() WHERE id = $2',
+          [newRemaining, allocation.id]
+        );
+        await client.query(
+          'INSERT INTO transactions (id, user_id, vendor_id, meal_type_id, qr_token_id, meal_remaining_after, transaction_date, transaction_time) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())',
+          [txId, user.id, req.session.vendor_id, activeMeal.id, qrToken.id, newRemaining, txDate]
+        );
+        await client.query('COMMIT');
+      } catch (txErr) {
+        await client.query('ROLLBACK');
+        throw txErr;
+      } finally {
+        client.release();
+      }
 
       res.json({
         status: 'approved',
@@ -814,32 +773,27 @@ app.post('/api/admin/fix-database', authenticateSession, async (req, res) => {
       return res.status(403).json({ error: 'Not an admin session' });
     }
 
-    db.serialize(() => {
-      console.log('🛠️ Manual database repair triggered...');
-      db.run("CREATE TABLE IF NOT EXISTS event_consumptions_backup AS SELECT * FROM event_consumptions");
-      db.run("DROP TABLE IF EXISTS event_consumptions");
-      db.run(`
-        CREATE TABLE event_consumptions (
-          id TEXT PRIMARY KEY,
-          event_id TEXT NOT NULL,
-          user_id TEXT NOT NULL,
-          meal_type_id TEXT NOT NULL,
-          consumed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          vendor_id TEXT,
-          FOREIGN KEY (event_id) REFERENCES events(id),
-          FOREIGN KEY (user_id) REFERENCES users(id),
-          FOREIGN KEY (meal_type_id) REFERENCES meal_types(id),
-          FOREIGN KEY (vendor_id) REFERENCES vendors(id)
-        )
-      `);
-      db.run("INSERT OR IGNORE INTO event_consumptions SELECT * FROM event_consumptions_backup");
-      db.run("DROP TABLE IF EXISTS event_consumptions_backup");
-
-      // Also ensure all users have 10 meals
-      db.run("UPDATE meal_allocations SET allocated = 10, remaining = 10");
-
-      console.log('✅ Manual repair complete.');
-    });
+    console.log('🛠️ Manual database repair triggered...');
+    await dbRun(`CREATE TABLE IF NOT EXISTS event_consumptions_backup AS SELECT * FROM event_consumptions`);
+    await dbRun(`DROP TABLE IF EXISTS event_consumptions`);
+    await dbRun(`
+      CREATE TABLE event_consumptions (
+        id TEXT PRIMARY KEY,
+        event_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        meal_type_id TEXT NOT NULL,
+        consumed_at TIMESTAMPTZ DEFAULT NOW(),
+        vendor_id TEXT,
+        FOREIGN KEY (event_id) REFERENCES events(id),
+        FOREIGN KEY (user_id) REFERENCES users(id),
+        FOREIGN KEY (meal_type_id) REFERENCES meal_types(id),
+        FOREIGN KEY (vendor_id) REFERENCES vendors(id)
+      )
+    `);
+    await dbRun(`INSERT INTO event_consumptions SELECT * FROM event_consumptions_backup`);
+    await dbRun(`DROP TABLE IF EXISTS event_consumptions_backup`);
+    await dbRun(`UPDATE meal_allocations SET allocated = 10, remaining = 10`);
+    console.log('✅ Manual repair complete.');
 
     res.json({ success: true, message: 'Database constraint removed. Multi-day meals now allowed.' });
   } catch (err) {
@@ -932,7 +886,7 @@ app.get('/api/admin/dashboard', authenticateSession, async (req, res) => {
         SELECT 
           t.id,
           t.transaction_date,
-          strftime('%H:%M:%S', t.transaction_time) as transaction_time,
+          TO_CHAR(t.transaction_time, 'HH24:MI:SS') as transaction_time,
           u.id as user_id,
           u.name as user_name,
           u.registration_number,
@@ -953,7 +907,7 @@ app.get('/api/admin/dashboard', authenticateSession, async (req, res) => {
         SELECT 
           ec.id,
           DATE(ec.consumed_at) as transaction_date,
-          strftime('%H:%M:%S', ec.consumed_at) as transaction_time,
+          TO_CHAR(ec.consumed_at, 'HH24:MI:SS') as transaction_time,
           u.id as user_id,
           u.name as user_name,
           u.registration_number,
@@ -1166,7 +1120,7 @@ app.get('/api/admin/daily-summary', authenticateSession, async (req, res) => {
       SELECT 
         t.id,
         t.transaction_date,
-        strftime('%H:%M:%S', t.transaction_time) as transaction_time,
+        TO_CHAR(t.transaction_time, 'HH24:MI:SS') as transaction_time,
         u.id as user_id,
         u.name as user_name,
         u.registration_number,
@@ -1189,7 +1143,7 @@ app.get('/api/admin/daily-summary', authenticateSession, async (req, res) => {
       SELECT 
         ec.id,
         DATE(ec.consumed_at) as transaction_date,
-        strftime('%H:%M:%S', ec.consumed_at) as transaction_time,
+        TO_CHAR(ec.consumed_at, 'HH24:MI:SS') as transaction_time,
         u.id as user_id,
         u.name as user_name,
         u.registration_number,
@@ -1362,7 +1316,7 @@ app.get('/api/admin/reports', authenticateSession, async (req, res) => {
       SELECT 
         t.id,
         t.transaction_date,
-        strftime('%H:%M:%S', t.transaction_time) as transaction_time,
+        TO_CHAR(t.transaction_time, 'HH24:MI:SS') as transaction_time,
         u.id as user_id,
         u.name as user_name,
         u.registration_number,
@@ -1404,7 +1358,7 @@ app.get('/api/admin/reports', authenticateSession, async (req, res) => {
       SELECT 
         ec.id,
         DATE(ec.consumed_at) as transaction_date,
-        strftime('%H:%M:%S', ec.consumed_at) as transaction_time,
+        TO_CHAR(ec.consumed_at, 'HH24:MI:SS') as transaction_time,
         u.id as user_id,
         u.name as user_name,
         u.registration_number,
@@ -1525,7 +1479,7 @@ app.get('/api/admin/consolidated-report', authenticateSession, async (req, res) 
       SELECT 
         t.id,
         t.transaction_date,
-        strftime('%H:%M:%S', t.transaction_time) as transaction_time,
+        TO_CHAR(t.transaction_time, 'HH24:MI:SS') as transaction_time,
         u.name as user_name,
         u.registration_number,
         v.name as vendor_name,
@@ -1544,7 +1498,7 @@ app.get('/api/admin/consolidated-report', authenticateSession, async (req, res) 
       SELECT 
         ec.id,
         DATE(ec.consumed_at) as transaction_date,
-        strftime('%H:%M:%S', ec.consumed_at) as transaction_time,
+        TO_CHAR(ec.consumed_at, 'HH24:MI:SS') as transaction_time,
         u.name as user_name,
         u.registration_number,
         COALESCE(v.name, 'N/A') as vendor_name,
@@ -1781,7 +1735,7 @@ app.get('/api/admin/stats/meals-per-time', authenticateSession, async (req, res)
     // Legacy transactions
     const legacyStats = await dbAll(
       `SELECT 
-        strftime('%H', t.transaction_time) as hour,
+        EXTRACT(HOUR FROM t.transaction_time)::text as hour,
         mt.name as meal_type,
         mt.id as meal_type_id,
         COUNT(t.id) as count,
@@ -1797,7 +1751,7 @@ app.get('/api/admin/stats/meals-per-time', authenticateSession, async (req, res)
     // Event consumptions
     const eventStats = await dbAll(
       `SELECT 
-        strftime('%H', ec.consumed_at) as hour,
+        EXTRACT(HOUR FROM ec.consumed_at)::text as hour,
         mt.name as meal_type,
         mt.id as meal_type_id,
         COUNT(ec.id) as count,
@@ -1931,7 +1885,7 @@ app.post('/api/admin/allocate-meals', authenticateSession, async (req, res) => {
             }
 
             await dbRun(
-              `UPDATE meal_allocations SET allocated = ?, remaining = ?, updated_at = datetime("now") WHERE id = ?`,
+              `UPDATE meal_allocations SET allocated = ?, remaining = ?, updated_at = NOW() WHERE id = ?`,
               [newAllocated, newRemaining, allocation.id]
             );
             updated++;
@@ -2024,7 +1978,7 @@ app.post('/api/admin/allocate-meals/all', authenticateSession, async (req, res) 
         }
 
         await dbRun(
-          `UPDATE meal_allocations SET allocated = ?, remaining = ?, updated_at = datetime('now') WHERE id = ?`,
+          `UPDATE meal_allocations SET allocated = ?, remaining = ?, updated_at = NOW() WHERE id = ?`,
           [newAllocated, newRemaining, allocation.id]
         );
         updated++;
@@ -2139,7 +2093,7 @@ app.post('/api/admin/users/:userId/meals', authenticateSession, async (req, res)
       if (mealType) {
         await dbRun(
           `UPDATE meal_allocations 
-           SET allocated = ?, remaining = ?, updated_at = datetime('now')
+           SET allocated = ?, remaining = ?, updated_at = NOW()
            WHERE user_id = ? AND meal_type_id = ?`,
           [meal.allocated, meal.remaining, req.params.userId, mealType.id]
         );
@@ -2254,8 +2208,9 @@ app.post('/api/admin/events/:eventId/registrations', authenticateSession, async 
     let added = 0;
     for (const userId of userIds) {
       const result = await dbRun(
-        `INSERT OR IGNORE INTO event_registrations (id, event_id, user_id)
-         VALUES (?, ?, ?)`,
+        `INSERT INTO event_registrations (id, event_id, user_id)
+         VALUES (?, ?, ?)
+         ON CONFLICT (event_id, user_id) DO NOTHING`,
         [generateId(), eventId, userId]
       );
       if (result && result.changes > 0) added++;
@@ -2285,8 +2240,9 @@ app.post('/api/admin/events/:eventId/registrations/all', authenticateSession, as
     let added = 0;
     for (const user of users) {
       const result = await dbRun(
-        `INSERT OR IGNORE INTO event_registrations (id, event_id, user_id)
-         VALUES (?, ?, ?)`,
+        `INSERT INTO event_registrations (id, event_id, user_id)
+         VALUES (?, ?, ?)
+         ON CONFLICT (event_id, user_id) DO NOTHING`,
         [generateId(), eventId, user.id]
       );
       if (result && result.changes > 0) added++;
@@ -2664,7 +2620,7 @@ app.get('/api/admin/events/:eventId/live-feed', authenticateSession, async (req,
         mt.name as meal_type,
         v.id as vendor_id,
         v.name as vendor_name,
-        strftime('%H:%M:%S', ec.consumed_at) as consumption_time
+        TO_CHAR(ec.consumed_at, 'HH24:MI:SS') as consumption_time
       FROM event_consumptions ec
       JOIN users u ON ec.user_id = u.id
       JOIN meal_types mt ON ec.meal_type_id = mt.id
@@ -2772,29 +2728,19 @@ setInterval(() => {
 // ===== DATABASE OPTIMIZATIONS =====
 let dbConnected = false;
 
-function initDatabase() {
-  return new Promise((resolve, reject) => {
-    db.serialize(() => {
-      db.run("PRAGMA journal_mode=WAL", (err) => {
-        if (err) console.warn('WAL mode warning:', err);
-      });
-      db.run("PRAGMA synchronous=NORMAL", (err) => {
-        if (err) console.warn('Sync mode warning:', err);
-      });
-      db.run("PRAGMA busy_timeout=5000", (err) => {
-        if (err) console.warn('Busy timeout warning:', err);
-      });
-
-      dbConnected = true;
-      console.log('✅ Database initialized with optimizations');
-      resolve();
-    });
-  });
+async function initDatabase() {
+  try {
+    const { pool } = require('./db');
+    await pool.query('SELECT 1');
+    dbConnected = true;
+    console.log('✅ Connected to PostgreSQL database');
+  } catch (err) {
+    console.error('Database connection failed:', err.message);
+    dbConnected = false;
+  }
 }
 
-initDatabase().catch(err => {
-  console.error('Database initialization failed:', err);
-});
+initDatabase();
 
 // ===== ADMIN RECONCILIATION & SYNC ENDPOINTS =====
 
@@ -2955,7 +2901,7 @@ app.post('/api/admin/sync/meal-allocations', authenticateSession, async (req, re
 
         await dbRun(`
           UPDATE meal_allocations 
-          SET remaining = ?, consumed_count = ?, updated_at = datetime('now')
+          SET remaining = ?, consumed_count = ?, updated_at = NOW()
           WHERE id = ?
         `, [newRemaining, consumedCount, alloc.id]);
 
@@ -3045,6 +2991,149 @@ app.post('/api/admin/sync/event-consumptions', authenticateSession, async (req, 
   }
 });
 
+// ===== BULK USER IMPORT =====
+
+const { parseUserFile } = require('./csv-parser');
+
+/**
+ * POST /api/admin/users/bulk-import
+ * Accepts:
+ *   { text: "CSV or pipe-delimited content" }
+ *   { users: [{ registrationNumber, name, pin }] }
+ *   { file: "base64-encoded-content", filename: "users.csv" }
+ * Auto-detects format: CSV, TSV, pipe-delimited, Excel export, or "Name: X | ID: Y | PIN: Z"
+ */
+app.post('/api/admin/users/bulk-import', authenticateSession, async (req, res) => {
+  try {
+    if (!req.session.admin_id) {
+      return res.status(403).json({ error: 'Not an admin session' });
+    }
+
+    const createAllocations = req.body.allocateMeals !== false;
+    let fileContent = '';
+
+    if (req.body.users && Array.isArray(req.body.users)) {
+      // Direct user array - convert to our normalized format
+      const parsed = { users: req.body.users, errors: [], stats: { total: req.body.users.length, imported: 0, duplicates: 0, invalid: 0 } };
+      fileContent = null; // Skip CSV parsing
+      var preParsed = parsed;
+    } else if (req.body.text && typeof req.body.text === 'string') {
+      fileContent = req.body.text;
+    } else if (req.body.file && typeof req.body.file === 'string') {
+      fileContent = Buffer.from(req.body.file, 'base64').toString('utf8');
+    } else {
+      return res.status(400).json({ error: 'Provide text content, base64 file, or users array' });
+    }
+
+    let parseResult;
+    if (preParsed) {
+      parseResult = preParsed;
+      // Normalize pre-parsed users
+      parseResult.users = parseResult.users.map(u => {
+        if (u.name && u.registrationNumber) return { name: u.name, registrationNumber: u.registrationNumber, pin: u.pin || '1234' };
+        return null;
+      }).filter(Boolean);
+      parseResult.stats.imported = parseResult.users.length;
+    } else {
+      parseResult = parseUserFile(fileContent);
+    }
+
+    const { users, errors: parseErrors, stats } = parseResult;
+
+    if (users.length === 0) {
+      return res.status(400).json({
+        error: 'No valid users found',
+        parseStats: stats,
+        parseErrors: parseErrors.slice(0, 20),
+      });
+    }
+
+    // Batch insert for performance - collect all users, hash PINs, then bulk insert
+    let imported = 0;
+    let skipped = 0;
+    const importErrors = [];
+
+    // Pre-fetch existing registration numbers in one query
+    const existingUsers = await dbAll('SELECT registration_number FROM users');
+    const existingRegNums = new Set(existingUsers.map(u => u.registration_number));
+
+    // Get meal types once
+    const mealTypes = createAllocations ? await dbAll('SELECT id FROM meal_types WHERE active = 1') : [];
+
+    // Process in batches of 50
+    const BATCH_SIZE = 50;
+    for (let i = 0; i < users.length; i += BATCH_SIZE) {
+      const batch = users.slice(i, i + BATCH_SIZE);
+
+      // Hash all PINs in parallel
+      const hashedUsers = await Promise.all(
+        batch.map(async (u) => {
+          const pinHash = await hashPassword(u.pin.toString());
+          return { ...u, pinHash };
+        })
+      );
+
+      for (const u of hashedUsers) {
+        if (existingRegNums.has(u.registrationNumber)) {
+          skipped++;
+          continue;
+        }
+
+        try {
+          const userId = generateId();
+
+          await dbRun(
+            `INSERT INTO users (id, registration_number, name, pin_hash, active)
+             VALUES (?, ?, ?, ?, 1)
+             ON CONFLICT (registration_number) DO NOTHING`,
+            [userId, u.registrationNumber, u.name, u.pinHash]
+          );
+
+          // Check if insert actually happened (ON CONFLICT may silently skip)
+          const check = await dbGet('SELECT id FROM users WHERE registration_number = ?', [u.registrationNumber]);
+          if (check && check.id !== userId) {
+            skipped++;
+            continue;
+          }
+
+          existingRegNums.add(u.registrationNumber);
+
+          if (createAllocations && mealTypes.length > 0) {
+            // Batch insert allocations
+            for (const mt of mealTypes) {
+              const allocId = generateId();
+              await dbRun(
+                `INSERT INTO meal_allocations (id, user_id, meal_type_id, allocated, remaining)
+                 VALUES (?, ?, ?, 20, 20)`,
+                [allocId, userId, mt.id]
+              );
+            }
+          }
+
+          imported++;
+        } catch (err) {
+          importErrors.push({ user: u.registrationNumber, error: err.message });
+          skipped++;
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Imported ${imported} users, skipped ${skipped}`,
+      imported,
+      skipped,
+      parseStats: stats,
+      parseErrors: parseErrors.length > 0 ? parseErrors.slice(0, 20) : undefined,
+      importErrors: importErrors.length > 0 ? importErrors.slice(0, 50) : undefined,
+      totalProcessed: users.length,
+    });
+  } catch (err) {
+    console.error('Bulk import error:', err);
+    res.status(500).json({ error: 'Bulk import failed: ' + err.message });
+  }
+});
+
 // ===== HEALTH CHECK =====
 
 app.get('/api/health', (req, res) => {
@@ -3064,9 +3153,24 @@ process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('SIGTERM received, shutting down...');
+  await closePool();
+  process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  console.log('SIGINT received, shutting down...');
+  await closePool();
+  process.exit(0);
+});
+
 // ===== START SERVER =====
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`\n🚀 Meal Ticket API running on http://localhost:${PORT}`);
   console.log(`📚 API docs: http://localhost:${PORT}/api/health\n`);
 });
+
+module.exports = app;
