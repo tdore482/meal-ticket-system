@@ -6,20 +6,20 @@
 
 const { Pool } = require('pg');
 
-const poolConfig = process.env.DATABASE_URL
+const poolConfig = process.env.PGHOST
   ? {
-      connectionString: process.env.DATABASE_URL,
+      host: process.env.PGHOST,
+      port: parseInt(process.env.PGPORT || '5432'),
+      user: process.env.PGUSER,
+      password: process.env.PGPASSWORD,
+      database: process.env.PGDATABASE || 'postgres',
       ssl: { rejectUnauthorized: false },
       max: 10,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 30000,
     }
   : {
-      host: process.env.PGHOST,
-      port: parseInt(process.env.PGPORT || '5432'),
-      user: process.env.PGUSER,
-      password: process.env.PGPASSWORD,
-      database: process.env.PGDATABASE || 'postgres',
+      connectionString: process.env.DATABASE_URL,
       ssl: { rejectUnauthorized: false },
       max: 10,
       idleTimeoutMillis: 30000,
