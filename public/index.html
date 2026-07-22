@@ -1384,9 +1384,11 @@
             </div>
           </div>
         </div>
+      </div>
 
-        <!-- Meal Schedule Page -->
-        <div id="admin-page-meal-schedule" class="admin-page hidden">
+      <!-- Meal Schedule Page -->
+      <div id="admin-page-meal-schedule" class="admin-page hidden">
+        <div class="container">
           <div class="dashboard-card">
             <div class="section-header">
               <div class="section-header-icon">
@@ -2489,6 +2491,7 @@
           <a href="${window.location.origin}/api/admin/events/${eventId}/export-pdf" target="_blank" 
              onclick="return exportEventPDF('${eventId}', event)"
              style="background:var(--success); color:white; padding:10px 20px; border:none; cursor:pointer; text-decoration:none; font-weight:700; display:inline-block;">Export PDF</a>
+          <button onclick="downloadSelectedQR('${eventId}')" id="batchQrBtn" style="background:#1a1a1a; color:white; padding:10px 20px; border:none; font-weight:700; cursor:pointer;${event.registrations.some(r => r.qr_token) ? '' : ' display:none;'}">Download Selected QR (ZIP)</button>
         </div>
       </div>
       <div style="margin-bottom:16px;">
@@ -2504,22 +2507,25 @@
       <table style="width:100%; margin-top:16px;">
         <thead>
           <tr>
+            <th style="width:36px;"><input type="checkbox" id="selectAllEventQR" onchange="toggleAllEventQR(this)" title="Select all"></th>
             <th>Name</th>
             <th>Reg #</th>
             <th>Meals Remaining</th>
             <th>QR</th>
-            <th></th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          ${event.registrations.length === 0 ? '<tr><td colspan="5" style="text-align:center; padding:20px;">No registrations yet.</td></tr>' : ''}
+          ${event.registrations.length === 0 ? '<tr><td colspan="6" style="text-align:center; padding:20px;">No registrations yet.</td></tr>' : ''}
           ${event.registrations.map(r => `
             <tr>
+              <td>${r.qr_token ? `<input type="checkbox" class="event-qr-cb" value="${r.user_id}" onchange="updateBatchQrBtn('${eventId}')">` : ''}</td>
               <td>${r.name}</td>
               <td>${r.registration_number}</td>
               <td>${10 - (r.consumed_count || 0)}/10</td>
               <td>${r.qr_token ? '✓' : '—'}</td>
-              <td>
+              <td style="display:flex; gap:4px; flex-wrap:wrap;">
+                ${r.qr_token ? `<button onclick="downloadSingleQR('${eventId}', '${r.user_id}')" style="background:var(--primary); color:var(--dark-bg); padding:4px 8px; border:none; cursor:pointer; font-size:11px; font-weight:700;">Download QR</button>` : ''}
                 <button onclick="removeUserFromEvent('${eventId}', '${r.user_id}')" style="background:var(--error); color:white; padding:4px 8px; border:none; cursor:pointer; font-size:11px;">Remove</button>
               </td>
             </tr>
@@ -2601,6 +2607,66 @@
         })
         .catch(err => alert('Failed to export PDF: ' + err.message));
       return false;
+    }
+
+    function downloadSingleQR(eventId, userId) {
+      window.open(`${API_BASE}/admin/events/${eventId}/qr-image/${userId}`, '_blank');
+    }
+
+    function toggleAllEventQR(selectAllCb) {
+      document.querySelectorAll('.event-qr-cb').forEach(cb => {
+        cb.checked = selectAllCb.checked;
+      });
+      const eventId = selectAllCb.closest('[data-event-id]')?.getAttribute('data-event-id')
+        || document.querySelector('[onclick*="viewEvent("]')?.getAttribute('onclick')?.match(/viewEvent\('([^']+)'\)/)?.[1];
+      if (eventId) updateBatchQrBtn(eventId);
+    }
+
+    function updateBatchQrBtn(eventId) {
+      const checked = document.querySelectorAll('.event-qr-cb:checked').length;
+      const btn = document.getElementById('batchQrBtn');
+      if (btn) {
+        btn.textContent = checked > 0 ? `Download Selected QR (${checked}) — ZIP` : 'Download Selected QR (ZIP)';
+      }
+    }
+
+    async function downloadSelectedQR(eventId) {
+      const userIds = Array.from(document.querySelectorAll('.event-qr-cb:checked')).map(cb => cb.value);
+      if (userIds.length === 0) {
+        alert('No users selected.');
+        return;
+      }
+      try {
+        const response = await fetch(`${API_BASE}/admin/events/${eventId}/qr-batch-zip`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(sessionToken && { 'Authorization': `Bearer ${sessionToken}` })
+          },
+          body: JSON.stringify({ userIds })
+        });
+        if (!response.ok) {
+          const err = await response.json();
+          alert('Error: ' + (err.error || 'Failed to generate zip'));
+          return;
+        }
+        const blob = await response.blob();
+        const disposition = response.headers.get('Content-Disposition');
+        let filename = 'QR_Codes.zip';
+        if (disposition) {
+          const match = disposition.match(/filename="?([^"]+)"?/);
+          if (match) filename = match[1];
+        }
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(a.href);
+      } catch (err) {
+        alert('Download failed: ' + err.message);
+      }
     }
 
     // Reports Functions

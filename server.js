@@ -10,6 +10,7 @@ const crypto = require('crypto');
 const cors = require('cors');
 const PDFDocument = require('pdfkit');
 const QRCode = require('qrcode');
+const JSZip = require('jszip');
 require('dotenv').config();
 
 const { dbRun, dbGet, dbAll, getClient, closePool } = require('./db');
@@ -2470,6 +2471,128 @@ app.get('/api/admin/events/:eventId/export-pdf', authenticateSession, async (req
   } catch (err) {
     console.error('PDF export error:', err);
     res.status(500).json({ error: 'Failed to export PDF: ' + err.message });
+  }
+});
+
+/**
+ * GET /api/admin/events/:eventId/qr-image/:userId
+ * Returns a QR code PNG image for a single user
+ * Query: ?size=300 (optional, default 300px)
+ */
+app.get('/api/admin/events/:eventId/qr-image/:userId', authenticateSession, async (req, res) => {
+  try {
+    if (!req.session.admin_id) {
+      return res.status(403).json({ error: 'Not an admin session' });
+    }
+
+    const { eventId, userId } = req.params;
+    const size = Math.min(1000, Math.max(100, parseInt(req.query.size) || 300));
+
+    const event = await dbGet('SELECT * FROM events WHERE id = ?', [eventId]);
+    if (!event) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+
+    const user = await dbGet(
+      'SELECT id, name, registration_number FROM users WHERE id = ?',
+      [userId]
+    );
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const tokenRow = await dbGet(
+      'SELECT token FROM event_qr_tokens WHERE event_id = ? AND user_id = ?',
+      [eventId, userId]
+    );
+    if (!tokenRow) {
+      return res.status(400).json({ error: 'No QR token generated. Run "Generate QR" first.' });
+    }
+
+    const qrData = `EVT:${eventId}|REG:${user.registration_number}|TOKEN:${tokenRow.token}`;
+    const qrBuffer = await QRCode.toBuffer(qrData, {
+      width: size,
+      margin: 2,
+      errorCorrectionLevel: 'H',
+      color: { dark: '#000000', light: '#ffffff' }
+    });
+
+    const safeName = user.name.replace(/[^a-zA-Z0-9]/g, '_');
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Content-Disposition', `inline; filename="QR_${user.registration_number}_${safeName}.png"`);
+    res.send(qrBuffer);
+  } catch (err) {
+    console.error('QR image error:', err);
+    res.status(500).json({ error: 'Failed to generate QR image: ' + err.message });
+  }
+});
+
+/**
+ * POST /api/admin/events/:eventId/qr-batch-zip
+ * Body: { userIds: string[] }
+ * Returns a ZIP file containing QR code PNG images for all specified users
+ */
+app.post('/api/admin/events/:eventId/qr-batch-zip', authenticateSession, async (req, res) => {
+  try {
+    if (!req.session.admin_id) {
+      return res.status(403).json({ error: 'Not an admin session' });
+    }
+
+    const { eventId } = req.params;
+    const { userIds } = req.body;
+
+    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(400).json({ error: 'userIds array required (at least 1 user)' });
+    }
+
+    const event = await dbGet('SELECT * FROM events WHERE id = ?', [eventId]);
+    if (!event) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+
+    const zip = new JSZip();
+    let added = 0;
+
+    for (const userId of userIds) {
+      const user = await dbGet(
+        'SELECT id, name, registration_number FROM users WHERE id = ?',
+        [userId]
+      );
+      if (!user) continue;
+
+      const tokenRow = await dbGet(
+        'SELECT token FROM event_qr_tokens WHERE event_id = ? AND user_id = ?',
+        [eventId, userId]
+      );
+      if (!tokenRow) continue;
+
+      const qrData = `EVT:${eventId}|REG:${user.registration_number}|TOKEN:${tokenRow.token}`;
+      const qrBuffer = await QRCode.toBuffer(qrData, {
+        width: 400,
+        margin: 2,
+        errorCorrectionLevel: 'H',
+        color: { dark: '#000000', light: '#ffffff' }
+      });
+
+      const safeName = user.name.replace(/[^a-zA-Z0-9]/g, '_');
+      const filename = `${user.registration_number}_${safeName}.png`;
+      zip.file(filename, qrBuffer);
+      added++;
+    }
+
+    if (added === 0) {
+      return res.status(400).json({ error: 'No valid QR codes found for selected users. Generate QR tokens first.' });
+    }
+
+    const zipBuffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+
+    const safeEventName = event.name.replace(/[^a-zA-Z0-9]/g, '_');
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${safeEventName}_QR_Codes.zip"`);
+    res.send(zipBuffer);
+  } catch (err) {
+    console.error('Batch QR zip error:', err);
+    res.status(500).json({ error: 'Failed to generate zip: ' + err.message });
   }
 });
 
