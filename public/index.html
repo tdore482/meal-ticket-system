@@ -12,824 +12,20 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700&family=Manrope:wght@400;500;700&display=swap"
-    rel="stylesheet">
-
-  <style>
-    :root {
-      /* New User Palette: Beige Grey, Red, Black */
-      --bg-color: #e8e6e1; /* The main beige grey background */
-      --card-bg: #f5f4f0; /* Slightly lighter beige */
-      --dark-bg: #121212; /* Black panel color */
-      --primary: #c62828; /* Professional Deep Red */
-      --primary-hover: #b71c1c; /* Darker Red */
-      --text-main: #121212; 
-      --text-muted: #757575;
-      --success: #2e7d32; /* Natural Green */
-      --error: #d32f2f; /* Alert Red */
-      --border: #dcd8d0; /* Muted Border */
-    }
-
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    body {
-      font-family: 'Manrope', sans-serif;
-      background-color: var(--bg-color);
-      color: var(--text-main);
-      -webkit-font-smoothing: antialiased;
-    }
-
-    /* Typography Overrides */
-    h1,
-    h2,
-    .brand-font {
-      font-family: 'Anton', sans-serif;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    /* Utilities */
-    .hidden {
-      display: none !important;
-    }
-
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 24px;
-    }
-
-    /* Admin Navigation Tabs */
-    #adminNavTabs {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-      gap: 0;
-    }
-    .admin-tab {
-      background: transparent;
-      border: none;
-      color: #6b7280;
-      padding: 12px 14px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      border-bottom: 3px solid transparent;
-      white-space: nowrap;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      font-family: 'Inter', 'Manrope', sans-serif;
-      letter-spacing: 0.3px;
-      text-align: center;
-      width: 100%;
-    }
-
-    .admin-tab svg {
-      width: 14px;
-      height: 14px;
-      flex-shrink: 0;
-    }
-
-    .admin-tab:hover {
-      color: var(--primary);
-      background: rgba(198, 40, 40, 0.08);
-    }
-
-    .admin-tab.active {
-      color: var(--primary);
-      border-bottom-color: var(--primary);
-      background: rgba(198, 40, 40, 0.06);
-    }
-
-    .admin-page {
-      animation: fadeIn 0.3s ease;
-    }
-
-    @keyframes fadeIn {
-      from {
-        opacity: 0;
-        transform: translateY(10px);
-      }
-
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    /* Stat Card Grid */
-    .stat-cards {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 16px;
-      margin-bottom: 32px;
-    }
-
-    .stat-card {
-      background: #fff;
-      border: 1px solid #e5e7eb;
-      border-radius: 8px;
-      padding: 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      transition: box-shadow 0.2s ease, transform 0.2s ease;
-    }
-
-    .stat-card:hover {
-      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
-      transform: translateY(-2px);
-    }
-
-    .stat-card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .stat-card-label {
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-      color: var(--text-muted);
-      font-family: 'Inter', sans-serif;
-    }
-
-    .stat-card-icon {
-      width: 36px;
-      height: 36px;
-      border-radius: 8px;
-      background: rgba(198, 40, 40, 0.12);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--primary);
-    }
-
-    .stat-card-icon svg {
-      width: 18px;
-      height: 18px;
-    }
-
-    .stat-card-value {
-      font-family: 'Anton', sans-serif;
-      font-size: 36px;
-      color: var(--text-main);
-      line-height: 1;
-    }
-
-    .stat-card.total .stat-card-icon {
-      background: rgba(18, 18, 18, 0.08); /* Dark grey based */
-      color: var(--dark-bg);
-    }
-
-    .stat-card.total {
-      border-left: 3px solid var(--primary);
-    }
-
-    /* Section header with icon */
-    .section-header {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 20px;
-    }
-
-    .section-header-icon {
-      width: 32px;
-      height: 32px;
-      border-radius: 6px;
-      background: var(--dark-bg);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--primary);
-      flex-shrink: 0;
-    }
-
-    .section-header-icon svg {
-      width: 16px;
-      height: 16px;
-    }
-
-    .section-header h2,
-    .section-header h3 {
-      margin: 0;
-    }
-
-    /* Inline icon buttons */
-    .icon-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-family: 'Inter', 'Manrope', sans-serif;
-      font-weight: 600;
-      font-size: 13px;
-    }
-
-    .icon-btn svg {
-      width: 15px;
-      height: 15px;
-      flex-shrink: 0;
-    }
-
-    /* --- Header --- */
-    .header {
-      background-color: var(--dark-bg);
-      color: #Eae7dc;
-      /* Light cream text */
-      padding: 20px 0;
-      position: sticky;
-      top: 0;
-      z-index: 50;
-    }
-
-    .header-content {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 0 24px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .header h1 {
-      font-size: 28px;
-      font-weight: 400;
-      /* Anton is bold by default */
-      color: var(--primary);
-    }
-
-    .header-right {
-      display: flex;
-      align-items: center;
-      gap: 20px;
-    }
-
-    #userDisplay {
-      font-family: 'Manrope', sans-serif;
-      font-size: 14px;
-      color: rgba(255, 255, 255, 0.7);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      padding: 8px 16px;
-      border-radius: 4px;
-    }
-
-    .logout-btn {
-      background-color: transparent;
-      color: #fff;
-      padding: 8px 0;
-      border: none;
-      border-bottom: 1px solid transparent;
-      cursor: pointer;
-      font-weight: 600;
-      font-size: 14px;
-      transition: all 0.2s;
-    }
-
-    .logout-btn:hover {
-      border-bottom-color: var(--primary);
-      color: var(--primary);
-    }
-
-    /* --- Login Page --- */
-    .login-page {
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background-color: var(--bg-color);
-      padding: 20px;
-      /* Texture overlay to match paper feel */
-      background-image: radial-gradient(#dcd9ce 1px, transparent 1px);
-      background-size: 20px 20px;
-    }
-
-    .login-box {
-      background: var(--bg-color);
-      border: 1px solid rgba(0, 0, 0, 0.05);
-      /* Soft shadow */
-      box-shadow: 20px 20px 60px #c7c4bb, -20px -20px 60px #ffffff;
-      border-radius: 24px;
-      padding: 48px;
-      width: 100%;
-      max-width: 420px;
-      animation: fadeIn 0.6s ease-out forwards;
-    }
-
-    .login-box h1 {
-      font-size: 48px;
-      text-align: center;
-      color: var(--text-main);
-      margin-bottom: 8px;
-      line-height: 1;
-    }
-
-    .login-box>p {
-      text-align: center;
-      color: var(--text-muted);
-      margin-bottom: 40px;
-      font-size: 14px;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-    }
-
-    /* Role Buttons - Styled like the Size Selector */
-    .role-buttons {
-      display: flex;
-      gap: 12px;
-      margin-bottom: 32px;
-      justify-content: center;
-    }
-
-    .role-btn {
-      flex: 1;
-      padding: 12px 0;
-      border: 1px solid #d1d5db;
-      background: transparent;
-      color: var(--text-muted);
-      font-family: 'Manrope', sans-serif;
-      font-weight: 600;
-      cursor: pointer;
-      font-size: 12px;
-      text-transform: uppercase;
-      transition: all 0.2s;
-    }
-
-    .role-btn:hover {
-      border-color: var(--text-main);
-    }
-
-    .role-btn.active {
-      background-color: var(--text-main);
-      color: #fff;
-      border-color: var(--text-main);
-    }
-
-    /* Forms */
-    .form-group {
-      margin-bottom: 20px;
-    }
-
-    .form-group label {
-      display: block;
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      font-weight: 700;
-      margin-bottom: 8px;
-      color: var(--text-muted);
-    }
-
-    .form-group input {
-      width: 100%;
-      padding: 16px;
-      border: none;
-      border-bottom: 2px solid #d1d5db;
-      background-color: rgba(255, 255, 255, 0.4);
-      font-size: 16px;
-      font-family: 'Manrope', sans-serif;
-      color: var(--text-main);
-      transition: all 0.3s;
-    }
-
-    .form-group input:focus {
-      outline: none;
-      border-bottom-color: var(--text-main);
-      background-color: rgba(255, 255, 255, 0.8);
-    }
-
-    .login-btn {
-      width: 100%;
-      padding: 16px;
-      background-color: var(--primary);
-      color: var(--text-main);
-      border: none;
-      border-radius: 50px;
-      /* Pill shape like 'Add to cart' */
-      font-weight: 700;
-      font-size: 16px;
-      cursor: pointer;
-      margin-top: 24px;
-      transition: transform 0.2s;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    .login-btn:hover {
-      background-color: var(--primary-hover);
-      transform: translateY(-2px);
-    }
-
-    .login-btn:disabled {
-      background-color: #d1d5db;
-      color: #9ca3af;
-      cursor: not-allowed;
-    }
-
-    /* --- Dashboard Elements --- */
-    .dashboard-card {
-      background: transparent;
-      margin-bottom: 40px;
-    }
-
-    .section-title {
-      font-size: 32px;
-      margin-bottom: 24px;
-      color: var(--text-main);
-    }
-
-    /* Summary Box - Styled like the "In your bag" section */
-    .summary-box {
-      background: #fff;
-      padding: 32px;
-      border-radius: 0;
-      /* Subtle border styling */
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 40px;
-    }
-
-    .summary-left p {
-      color: var(--text-muted);
-      font-size: 12px;
-      text-transform: uppercase;
-      margin-bottom: 8px;
-    }
-
-    .summary-left .total {
-      font-family: 'Anton', sans-serif;
-      font-size: 64px;
-      color: var(--text-main);
-      line-height: 1;
-    }
-
-    .status-badge {
-      display: inline-block;
-      padding: 6px 12px;
-      background: var(--dark-bg);
-      color: var(--primary);
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 8px;
-    }
-
-    .status-badge.active {
-      background: var(--success);
-      color: white;
-    }
-
-    .status-badge.inactive {
-      background: #d1d5db;
-      color: var(--text-muted);
-    }
-
-    .meal-name-display {
-      font-family: 'Anton', sans-serif;
-      font-size: 24px;
-      color: var(--text-main);
-      text-transform: uppercase;
-    }
-
-    /* Meal Cards Grid */
-    .meal-cards {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 24px;
-      margin-bottom: 48px;
-    }
-
-    .meal-card {
-      background: #fff;
-      padding: 24px;
-      text-align: center;
-      transition: all 0.3s ease;
-      position: relative;
-      border: 1px solid transparent;
-    }
-
-    .meal-card:hover {
-      transform: translateY(-5px);
-      box-shadow: 0 15px 30px rgba(0, 0, 0, 0.05);
-    }
-
-    .meal-card.active {
-      border: 2px solid var(--primary);
-      background-color: #fff;
-    }
-
-    /* Highlight tag for active card */
-    .meal-card.active::before {
-      content: "ACTIVE";
-      position: absolute;
-      top: -12px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: var(--primary);
-      color: var(--dark-bg);
-      font-size: 10px;
-      font-weight: bold;
-      padding: 4px 12px;
-      border-radius: 12px;
-    }
-
-    .meal-card-name {
-      font-size: 14px;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      font-weight: 700;
-      margin-bottom: 12px;
-      letter-spacing: 1px;
-    }
-
-    .meal-card-count {
-      font-family: 'Anton', sans-serif;
-      font-size: 48px;
-      color: var(--text-main);
-      margin-bottom: 16px;
-      line-height: 1;
-    }
-
-    .meal-card-time {
-      font-size: 12px;
-      color: var(--text-muted);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 6px;
-      background: var(--bg-color);
-      padding: 8px;
-      border-radius: 4px;
-    }
-
-    /* QR Section */
-    .qr-section {
-      background-color: transparent;
-      border-top: 1px solid #d1d5db;
-      padding: 48px 0;
-      text-align: center;
-    }
-
-    .qr-btn {
-      background-color: var(--dark-bg);
-      color: var(--primary);
-      padding: 16px 48px;
-      border: none;
-      border-radius: 50px;
-      font-weight: 700;
-      cursor: pointer;
-      font-size: 16px;
-      transition: all 0.2s;
-      text-transform: uppercase;
-    }
-
-    .qr-btn:hover {
-      background-color: #000;
-      color: #fff;
-    }
-
-    .qr-btn:disabled {
-      background-color: #d1d5db;
-      color: #fff;
-      cursor: not-allowed;
-    }
-
-    .qr-display-area {
-      margin-top: 32px;
-      background: white;
-      padding: 32px;
-      display: inline-block;
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
-    }
-
-    /* Camera & Scan */
-    .camera-container {
-      background: #000;
-      border-radius: 0;
-      overflow: hidden;
-      margin: 20px auto;
-      max-width: 500px;
-      border: 4px solid var(--dark-bg);
-    }
-
-    .scan-btn-primary {
-      background-color: var(--primary);
-      color: var(--dark-bg);
-      padding: 12px 24px;
-      border-radius: 0;
-      border: none;
-      font-weight: 700;
-      cursor: pointer;
-      text-transform: uppercase;
-    }
-
-    .scan-btn-stop {
-      background-color: var(--error);
-      color: white;
-      padding: 12px 24px;
-      border-radius: 0;
-      border: none;
-      font-weight: 700;
-      cursor: pointer;
-    }
-
-    /* Messages */
-    .error-msg {
-      background-color: #fee2e2;
-      color: #991b1b;
-      padding: 16px;
-      font-size: 13px;
-      margin-bottom: 24px;
-      border-left: 4px solid #991b1b;
-    }
-
-    .success-msg {
-      background-color: #dcfce7;
-      color: #166534;
-      padding: 16px;
-      margin-top: 16px;
-      text-align: center;
-    }
-
-    /* Tables (Admin) */
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 24px;
-      background: white;
-    }
-
-    th {
-      background: var(--dark-bg);
-      color: #fff;
-      padding: 16px;
-      text-align: left;
-      font-weight: 600;
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    }
-
-    td {
-      padding: 16px;
-      border-bottom: 1px solid #eee;
-      font-size: 14px;
-    }
-
-    tr:hover td {
-      background-color: #fafafa;
-    }
-
-    @keyframes fadeIn {
-      from {
-        opacity: 0;
-        transform: translateY(20px);
-      }
-
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    /* Modal Overlay styling */
-    .modal-overlay {
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0, 0, 0, 0.6);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-      backdrop-filter: blur(4px);
-      animation: fadeIn 0.2s ease-out;
-    }
-
-    .modal-content {
-      background: white;
-      border-radius: 12px;
-      padding: 32px;
-      width: 90%;
-      max-width: 500px;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
-    }
-
-    /* Search Bar Styling */
-    .search-input-wrap {
-      position: relative;
-      width: 100%;
-      max-width: 400px;
-      margin-bottom: 16px;
-    }
-
-    .search-input-wrap svg {
-      position: absolute;
-      left: 12px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: var(--text-muted);
-    }
-
-    .search-input-wrap input {
-      width: 100%;
-      padding: 10px 10px 10px 36px;
-      border: 1px solid #d1d5db;
-      border-radius: 6px;
-      outline: none;
-      font-size: 14px;
-      transition: border-color 0.2s;
-    }
-
-    .search-input-wrap input:focus {
-      border-color: var(--primary);
-    }
-
-    @media (max-width: 768px) {
-      .header-content {
-        flex-direction: column;
-        gap: 16px;
-        text-align: center;
-      }
-
-      .header-right {
-        flex-direction: column;
-        width: 100%;
-      }
-
-      .summary-box {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 24px;
-      }
-
-      .role-buttons {
-        flex-wrap: wrap;
-      }
-
-      .login-box {
-        padding: 32px 24px;
-      }
-    }
-
-    @media print {
-
-      .header,
-      #adminNavTabs,
-      .logout-btn,
-      .scan-btn-primary,
-      .admin-tab,
-      h1,
-      .section-title button {
-        display: none !important;
-      }
-
-      .container {
-        width: 100% !important;
-        max-width: none !important;
-        padding: 0 !important;
-        margin: 0 !important;
-      }
-
-      .dashboard-card {
-        box-shadow: none !important;
-        border: none !important;
-        padding: 0 !important;
-      }
-
-      body {
-        background: white !important;
-      }
-
-      .admin-page {
-        display: block !important;
-      }
-
-      .admin-page.hidden {
-        display: none !important;
-      }
-    }
-  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
+  <!-- LOGIN SCREEN -->
   <div id="loginPage" class="login-page">
     <div class="login-box">
-      <h1>MEAL <span style="color:var(--primary)">TICKETS</span></h1>
-      <p>Meal Management</p>
+      <h1 style="margin:0; text-align:center; font-size:32px; font-family:'Anton',sans-serif; text-transform:uppercase; letter-spacing:1px;">MEAL <span style="color:var(--accent)">TICKETS</span></h1>
+      <p>System Portal & Ticket Management</p>
 
       <div class="role-buttons">
         <button class="role-btn active" onclick="setRole('user')">User</button>
@@ -843,45 +39,45 @@
 
       <div id="userForm">
         <div class="form-group">
-          <label>Registration Number</label>
-          <input type="text" id="regNum" placeholder="REG001" value="REG001">
+          <label class="form-label">Registration Number</label>
+          <input type="text" class="form-input" id="regNum" placeholder="REG001" value="REG001">
         </div>
         <div class="form-group">
-          <label>Security PIN</label>
-          <input type="password" id="pin" placeholder="1234" value="1234">
+          <label class="form-label">Security PIN</label>
+          <input type="password" class="form-input" id="pin" placeholder="1234" value="1234">
         </div>
       </div>
 
       <div id="registerForm" class="hidden">
         <div class="form-group">
-          <label>Full Name</label>
-          <input type="text" id="regName" placeholder="John Doe" value="">
+          <label class="form-label">Full Name</label>
+          <input type="text" class="form-input" id="regName" placeholder="John Doe" value="">
         </div>
         <div class="form-group">
-          <label>Registration Number</label>
-          <input type="text" id="regNewNum" placeholder="REG003" value="">
+          <label class="form-label">Registration Number</label>
+          <input type="text" class="form-input" id="regNewNum" placeholder="REG003" value="">
         </div>
         <div class="form-group">
-          <label>Security PIN</label>
-          <input type="password" id="regNewPin" placeholder="1234" value="">
+          <label class="form-label">Security PIN</label>
+          <input type="password" class="form-input" id="regNewPin" placeholder="1234" value="">
         </div>
       </div>
 
       <div id="vendorForm" class="hidden">
         <div class="form-group">
-          <label>Vendor Code</label>
-          <input type="text" id="vendorCode" placeholder="bagsc_catering" value="cafe_a">
+          <label class="form-label">Vendor Code</label>
+          <input type="text" class="form-input" id="vendorCode" placeholder="bagsc_catering" value="cafe_a">
         </div>
       </div>
 
       <div id="adminForm" class="hidden">
         <div class="form-group">
-          <label>Username</label>
-          <input type="text" id="adminUsername" placeholder="admin" value="admin">
+          <label class="form-label">Username</label>
+          <input type="text" class="form-input" id="adminUsername" placeholder="admin" value="admin">
         </div>
         <div class="form-group">
-          <label>Password</label>
-          <input type="password" id="adminPassword" placeholder="admin123" value="admin123">
+          <label class="form-label">Password</label>
+          <input type="password" class="form-input" id="adminPassword" placeholder="admin123" value="admin123">
         </div>
       </div>
 
@@ -889,522 +85,497 @@
     </div>
   </div>
 
+  <!-- MAIN APP CONTAINER -->
   <div id="appContainer" class="hidden">
-    <div class="header">
-      <div class="header-content">
-        <h1>MEAL TICKETS <span style="color:var(--primary)">SYSTEM</span></h1>
-        <div class="header-right">
-          <span id="userDisplay"></span>
-          <button class="logout-btn" onclick="logout()">LOGOUT</button>
+
+    <!-- ADMIN SIDEBAR NAVIGATION -->
+    <aside class="sidebar hidden" id="appSidebar">
+      <a class="logo" href="#">
+        Meal<span>.</span> Tickets
+      </a>
+      <div class="nav-section">Main</div>
+      <button onclick="showAdminPage('daily-summary')" class="admin-tab active" data-page="daily-summary">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        Daily Overview
+      </button>
+      <button onclick="showAdminPage('events')" class="admin-tab" data-page="events">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Events
+      </button>
+      <button onclick="showAdminPage('users')" class="admin-tab" data-page="users">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        User Database
+      </button>
+      <div class="nav-divider"></div>
+      <div class="nav-section">Reports & Config</div>
+      <button onclick="showAdminPage('live-reports')" class="admin-tab" data-page="live-reports">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Live Feeds
+      </button>
+      <button onclick="showAdminPage('consolidated-report')" class="admin-tab" data-page="consolidated-report">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        Consolidated
+      </button>
+      <button onclick="showAdminPage('daily-matrix-report')" class="admin-tab" data-page="daily-matrix-report">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/></svg>
+        Matrix Report
+      </button>
+      <button onclick="showAdminPage('meal-schedule')" class="admin-tab" data-page="meal-schedule">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Meal Schedule
+      </button>
+      <div class="sidebar-footer">
+        <div class="avatar" id="sidebarAvatar">AD</div>
+        <div class="avatar-info">
+          <div class="name" id="sidebarName">Admin</div>
+          <div class="role">Administrator</div>
         </div>
+        <button onclick="logout()" title="Logout" class="logout-btn" style="padding:6px; min-width:auto;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
       </div>
-    </div>
+    </aside>
 
-    <div id="userDashboard" class="hidden">
-      <div class="container">
-        <div class="dashboard-card">
-          <h2 class="section-title" id="welcomeMsg"></h2>
-
-          <div class="summary-box">
-            <div class="summary-left">
-              <p>Total Remaining</p>
-              <div class="total" id="totalMeals">-</div>
-            </div>
-            <div class="summary-right" style="text-align: right;">
-              <div class="status-badge" id="mealStatus"></div>
-              <div class="meal-name-display" id="activeMealName"></div>
-            </div>
-          </div>
-
-          <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom: 24px;">
-            <h3 class="section-title" style="margin:0; font-size:24px;">Your Bag</h3>
-            <p style="font-size:12px; color:var(--text-muted);">CURRENT ALLOCATION</p>
-          </div>
-
-          <div class="meal-cards" id="mealCards"></div>
-
-          <div class="qr-section hidden" id="qrSection">
-            <button class="qr-btn" id="qrBtn" onclick="toggleQR()" disabled>
-              <span id="qrBtnText">Get Ticket Code</span>
-            </button>
-
-            <div class="qr-display-area hidden" id="qrDisplay">
-              <div style="background: #fafafa; padding: 12px; border: 1px dashed #d1d5db; margin-bottom: 16px;">
-                <p style="font-size: 10px; text-transform:uppercase; color: #6b7280; margin-bottom: 6px;">Token Code</p>
-                <div id="tokenDisplay"
-                  style="font-family: monospace; font-size: 16px; color: var(--text-main); font-weight:bold;">
-                  (Token will appear here)
-                </div>
-              </div>
-              <div id="qrcode" style="text-align: center; margin-bottom: 12px;"></div>
-              <p class="qr-timer" style="color:var(--error); font-size:12px;">Token refreshes on demand</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div id="vendorDashboard" class="hidden">
-      <div class="container">
-        <div class="dashboard-card">
-          <h2 class="section-title" id="vendorName"></h2>
-
-          <div id="mealStatusBox" style="margin-bottom: 24px;"></div>
-
-          <div id="mealTypeSelector" class="hidden" style="margin-bottom:20px;">
-            <p
-              style="margin-bottom:8px; font-size:12px; text-transform:uppercase; font-weight:700; color:var(--text-muted);">
-              Meal Type (for event tickets)</p>
-            <div id="mealTypeButtons" style="display:flex; gap:12px; flex-wrap:wrap;"></div>
-          </div>
-
-          <div class="scan-controls">
-            <button class="scan-btn-primary" id="startScanBtn" onclick="startScanner()">Open Camera</button>
-            <button class="scan-btn-stop hidden" id="stopScanBtn" onclick="stopScanner()">Close Camera</button>
-          </div>
-
-          <div id="cameraContainer" class="camera-container hidden">
-            <div id="reader"></div>
-          </div>
-
-          <div class="manual-entry">
-            <p
-              style="margin-bottom:12px; font-size:12px; text-transform:uppercase; font-weight:700; color:var(--text-muted);">
-              Manual Code Entry</p>
-            <div style="display:flex; gap:0;">
-              <input type="text" id="qrInput"
-                style="flex:1; padding:12px; border:1px solid #d1d5db; border-right:none; background:white;"
-                placeholder="REG:XXX|TOKEN:XXX or EVT:...|REG:...|TOKEN:...">
-              <button class="scan-btn-primary" onclick="processManualScan()">Check</button>
-            </div>
-          </div>
-
-          <div class="scan-result hidden" id="scanResult"></div>
-        </div>
-      </div>
-    </div>
-
-    <div id="adminDashboard" class="hidden">
-      <!-- Admin Navigation Tabs -->
-      <div style="background: var(--dark-bg); padding: 0; margin-bottom: 24px; border-radius: 0;">
-        <div id="adminNavTabs">
-          <button onclick="showAdminPage('daily-summary')" class="admin-tab active" data-page="daily-summary">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-            Daily Summary
-          </button>
-          <button onclick="showAdminPage('events')" class="admin-tab" data-page="events">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-            Events
-          </button>
-          <button onclick="showAdminPage('users')" class="admin-tab" data-page="users">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            User Database
-          </button>
-          <button onclick="showAdminPage('live-reports')" class="admin-tab" data-page="live-reports">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-            Live Feeds
-          </button>
-          <button onclick="showAdminPage('consolidated-report')" class="admin-tab" data-page="consolidated-report">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-            Consolidated
-          </button>
-          <button onclick="showAdminPage('daily-matrix-report')" class="admin-tab" data-page="daily-matrix-report">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/></svg>
-            Matrix Report
-          </button>
-          <button onclick="showAdminPage('meal-schedule')" class="admin-tab" data-page="meal-schedule">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            Meal Schedule
+    <!-- MAIN WRAPPER -->
+    <div class="main-wrapper" id="mainWrapper">
+      <header class="topbar">
+        <div class="topbar-title" id="topbarTitle">Meal Ticket System</div>
+        <div class="topbar-right">
+          <span id="userDisplay" style="font-size:13px; font-weight:500; color:var(--muted);"></span>
+          <button class="logout-btn" onclick="logout()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            Logout
           </button>
         </div>
-      </div>
+      </header>
 
-      <!-- Daily Summary Page -->
-      <div id="admin-page-daily-summary" class="admin-page">
+      <!-- USER DASHBOARD -->
+      <div id="userDashboard" class="hidden">
         <div class="container">
-          <div class="dashboard-card">
-            <div class="section-header">
-              <div class="section-header-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          <div class="section-card" style="padding: 1.5rem;">
+            <h2 class="section-title" id="welcomeMsg" style="margin-bottom:1rem;"></h2>
+
+            <div class="summary-box">
+              <div class="summary-left">
+                <p>Total Remaining Meals</p>
+                <div class="total" id="totalMeals">-</div>
               </div>
-              <h2 class="section-title" style="margin:0">Today's Overview</h2>
+              <div class="summary-right" style="text-align: right;">
+                <div class="status-badge" id="mealStatus"></div>
+                <div class="meal-name-display" id="activeMealName" style="font-weight:600; margin-top:4px;"></div>
+              </div>
             </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom: 1rem;">
+              <h3 class="section-title" style="margin:0; font-size:18px;">Meal Allocation Bag</h3>
+              <p style="font-size:11px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:0.8px;">Current Allocation</p>
+            </div>
+
+            <div class="meal-cards" id="mealCards"></div>
+
+            <div class="qr-section hidden" id="qrSection">
+              <button class="qr-btn" id="qrBtn" onclick="toggleQR()" disabled>
+                <span id="qrBtnText">Get Ticket Code</span>
+              </button>
+
+              <div class="qr-display-area hidden" id="qrDisplay" style="margin-top:1.5rem;">
+                <div style="background: #F9FAFB; padding: 14px; border: 1px dashed var(--border-md); border-radius:10px; margin-bottom: 16px;">
+                  <p style="font-size: 11px; text-transform:uppercase; color: var(--muted); font-weight:600; margin-bottom: 6px;">Token Code</p>
+                  <div id="tokenDisplay" style="font-family: monospace; font-size: 18px; color: var(--text); font-weight:bold;">
+                    (Token will appear here)
+                  </div>
+                </div>
+                <div id="qrcode" style="text-align: center; margin-bottom: 12px; display:flex; justify-content:center;"></div>
+                <p class="qr-timer" style="color:var(--danger); font-size:12px; font-weight:500;">Token refreshes on demand</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VENDOR DASHBOARD -->
+      <div id="vendorDashboard" class="hidden">
+        <div class="container">
+          <div class="section-card" style="padding: 1.5rem;">
+            <h2 class="section-title" id="vendorName" style="margin-bottom:1.25rem;"></h2>
+
+            <div id="mealStatusBox" style="margin-bottom: 1.5rem;"></div>
+
+            <div id="mealTypeSelector" class="hidden" style="margin-bottom:1.5rem;">
+              <p style="margin-bottom:8px; font-size:11px; text-transform:uppercase; font-weight:600; color:var(--muted); letter-spacing:0.8px;">Meal Type (for event tickets)</p>
+              <div id="mealTypeButtons" style="display:flex; gap:10px; flex-wrap:wrap;"></div>
+            </div>
+
+            <div class="scan-controls" style="margin-bottom: 1.5rem;">
+              <button class="btn btn-primary btn-accent" id="startScanBtn" onclick="startScanner()">Open Camera</button>
+              <button class="btn btn-danger hidden" id="stopScanBtn" onclick="stopScanner()">Close Camera</button>
+            </div>
+
+            <div id="cameraContainer" class="camera-container hidden">
+              <div id="reader"></div>
+            </div>
+
+            <div class="manual-entry" style="margin-top: 1.5rem;">
+              <p style="margin-bottom:8px; font-size:11px; text-transform:uppercase; font-weight:600; color:var(--muted); letter-spacing:0.8px;">Manual Code Entry</p>
+              <div style="display:flex; gap:8px; max-width:500px;">
+                <input type="text" class="form-input" id="qrInput" style="flex:1;" placeholder="REG:XXX|TOKEN:XXX or EVT:...|REG:...|TOKEN:...">
+                <button class="btn btn-primary" onclick="processManualScan()">Validate</button>
+              </div>
+            </div>
+
+            <div class="scan-result hidden" id="scanResult"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ADMIN DASHBOARD -->
+      <div id="adminDashboard" class="hidden">
+
+        <!-- Hidden legacy tab container for script backward compatibility -->
+        <div id="adminNavTabs" style="display:none;"></div>
+
+        <!-- Daily Summary Page -->
+        <div id="admin-page-daily-summary" class="admin-page">
+          <div class="container">
             <div class="stat-cards" id="todaySummary"></div>
-          </div>
 
-          <div class="dashboard-card">
-            <div class="section-header">
-              <div class="section-header-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            <div class="section-card">
+              <div class="section-header">
+                <h3 class="section-title">Recent Activity</h3>
+                <span class="td-muted">Real-time scan logs</span>
               </div>
-              <h3 class="section-title" style="margin:0; font-size:22px;">Recent Activity</h3>
-            </div>
-            <div style="overflow-x:auto;">
-              <table id="recentTransactionsTable">
-                <thead>
-                  <tr>
-                    <th>Time</th>
-                    <th>User</th>
-                    <th>Vendor</th>
-                    <th>Meal</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody id="recentTransactionTableBody">
-                  <tr>
-                    <td colspan="5" class="loading">Loading...</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Events Page -->
-      <div id="admin-page-events" class="admin-page hidden">
-        <div class="container">
-          <div class="dashboard-card">
-            <h3 class="section-title" style="font-size:24px;">Events</h3>
-            <p style="font-size:12px; color:var(--text-muted); margin-bottom:16px;">Create events, register users,
-              generate QR codes, and export printable PDFs.</p>
-            <div style="display:flex; gap:12px; margin-bottom:24px; flex-wrap:wrap;">
-              <input type="text" id="eventName" placeholder="Event name"
-                style="padding:10px 16px; border:1px solid #d1d5db; flex:1; min-width:180px;">
-              <input type="date" id="eventStartDate" style="padding:10px 16px; border:1px solid #d1d5db;">
-              <input type="date" id="eventEndDate" style="padding:10px 16px; border:1px solid #d1d5db;">
-              <button onclick="createNewEvent()"
-                style="background:var(--primary); color:var(--dark-bg); padding:10px 24px; border:none; font-weight:700; cursor:pointer;">Create
-                Event</button>
-            </div>
-            <div id="eventsList"></div>
-          </div>
-
-          <div class="dashboard-card hidden" id="eventDetailCard">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
-              <h3 class="section-title" style="margin:0; font-size:24px;" id="eventDetailTitle"></h3>
-              <button onclick="closeEventDetail()"
-                style="background:#6b7280; color:white; padding:8px 16px; border:none; cursor:pointer;">← Back</button>
-            </div>
-            <div id="eventDetailContent"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- User Database Page -->
-      <div id="admin-page-users" class="admin-page hidden">
-        <div class="container">
-          <div class="dashboard-card">
-            <h3 class="section-title" style="font-size:24px;">User Database</h3>
-            <p style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">Manage participant records, IDs, and
-              PINs. Select users using checkboxes for bulk meal allocation below.</p>
-
-            <!-- CSV/Spreadsheet Import -->
-            <div id="importSection" style="margin-bottom:20px;">
-              <div id="importDropZone"
-                style="border:2px dashed var(--border); border-radius:8px; padding:24px; text-align:center; cursor:pointer; transition:all 0.2s; background:var(--card-bg);"
-                ondragover="event.preventDefault(); this.style.borderColor='var(--primary)'; this.style.background='rgba(198,40,40,0.04)'"
-                ondragleave="this.style.borderColor='var(--border)'; this.style.background='var(--card-bg)'"
-                ondrop="event.preventDefault(); this.style.borderColor='var(--border)'; this.style.background='var(--card-bg)'; handleFileDrop(event)"
-                onclick="document.getElementById('importFileInput').click()">
-                <input type="file" id="importFileInput" accept=".csv,.tsv,.txt,.xls,.xlsx" style="display:none" onchange="handleFileSelect(event)">
-                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="1.5" style="margin-bottom:8px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                <p style="font-size:14px; color:var(--text-main); font-weight:600; margin-bottom:4px;">Drop CSV, TSV, or TXT file here</p>
-                <p style="font-size:11px; color:var(--text-muted);">Auto-detects: CSV, TSV, pipe-delimited, Excel export, or "Name: X | ID: Y | PIN: Z"</p>
-              </div>
-              <div id="importPreview" class="hidden" style="margin-top:12px; padding:16px; background:var(--card-bg); border-radius:8px; border:1px solid var(--border);">
-                <div id="importPreviewContent"></div>
-                <div style="display:flex; gap:8px; margin-top:12px; justify-content:flex-end;">
-                  <button onclick="cancelImport()" style="background:#e5e7eb; color:var(--text-main); padding:8px 20px; border:none; cursor:pointer; font-weight:600; border-radius:4px; font-size:13px;">Cancel</button>
-                  <button onclick="confirmImport()" id="confirmImportBtn" style="background:var(--success); color:white; padding:8px 20px; border:none; cursor:pointer; font-weight:600; border-radius:4px; font-size:13px;">Import Users</button>
-                </div>
-              </div>
-              <div id="importResult" class="hidden" style="margin-top:12px; padding:12px; border-radius:8px; font-size:13px;"></div>
-            </div>
-
-            <div class="search-input-wrap">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              <input type="text" id="userDbSearch" oninput="filterUserTable()" placeholder="Search by name or registration number...">
-            </div>
-            <div style="overflow-x:auto;">
-              <table id="usersTable">
-                <thead>
-                  <tr>
-                    <th style="width:40px;"><input type="checkbox" id="selectAllUsers" onchange="toggleAllUsers(this)">
-                    </th>
-                    <th>Registration #</th>
-                    <th>Name</th>
-                    <th>Accommodation</th>
-                    <th>Status</th>
-                    <th>Generated Token</th>
-                    <th>Token Expiry</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody id="usersTableBody">
-                  <tr>
-                    <td colspan="8" class="loading">Loading users...</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <!-- Edit Meal Modal -->
-          <div class="modal-overlay hidden" id="editMealCard">
-            <div class="modal-content">
-              <h3 class="section-title">Edit Allocation</h3>
-              <div id="editUserInfo" style="margin-bottom: 24px;"></div>
-              <div id="editMealForm" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
-              </div>
-              <div style="display: flex; gap: 12px; justify-content: flex-end;">
-                <button onclick="cancelEditMeals()" style="background: #e5e7eb; color: var(--text-main); padding: 10px 24px; border: none; cursor: pointer; font-weight: 600; border-radius: 4px;">Cancel</button>
-                <button onclick="saveEditedMeals()" style="background: var(--success); color: white; padding: 10px 24px; border: none; cursor: pointer; font-weight: 600; border-radius: 4px;">Save Changes</button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Bulk Allocation Section -->
-          <div class="dashboard-card">
-            <div class="section-header">
-              <div class="section-header-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
-              </div>
-              <h3 class="section-title" style="margin:0; font-size:22px;">Bulk Meal Allocation</h3>
-            </div>
-            <p style="font-size:12px; color:var(--text-muted); margin-bottom:16px;">Intuitively allocate meals to
-              multiple users at once.</p>
-
-            <div style="display:flex; gap:16px; flex-wrap:wrap; margin-bottom:16px;">
-              <div style="flex:1; min-width:200px;">
-                <label
-                  style="font-size:11px; text-transform:uppercase; font-weight:700; color:var(--text-muted); display:block; margin-bottom:4px;">Meal
-                  Type</label>
-                <select id="allocMealType"
-                  style="width:100%; padding:10px; border:1px solid #d1d5db; background:white;">
-                  <option value="">Select meal type...</option>
-                </select>
-              </div>
-              <div style="flex:1; min-width:200px;">
-                <label
-                  style="font-size:11px; text-transform:uppercase; font-weight:700; color:var(--text-muted); display:block; margin-bottom:4px;">Operation</label>
-                <select id="allocOperation"
-                  style="width:100%; padding:10px; border:1px solid #d1d5db; background:white;">
-                  <option value="add">Add Meals</option>
-                  <option value="set">Set Meals</option>
-                  <option value="reset">Reset to Default (Y=12 / N=4)</option>
-                </select>
-              </div>
-              <div style="flex:1; min-width:200px;">
-                <label
-                  style="font-size:11px; text-transform:uppercase; font-weight:700; color:var(--text-muted); display:block; margin-bottom:4px;">Amount</label>
-                <input type="number" id="allocAmount" value="10" min="0" max="999"
-                  style="width:100%; padding:10px; border:1px solid #d1d5db;">
-              </div>
-            </div>
-
-            <div style="display:flex; gap:12px; flex-wrap:wrap;">
-              <button onclick="allocateToSelected()"
-                style="background:var(--success); color:white; padding:12px 24px; border:none; font-weight:700; cursor:pointer;">Allocate
-                to Selected Users</button>
-              <button onclick="allocateToAll()"
-                style="background:var(--dark-bg); color:var(--primary); padding:12px 24px; border:none; font-weight:700; cursor:pointer;">Allocate
-                to ALL Users</button>
-            </div>
-
-            <div id="allocResult" style="margin-top:16px;"></div>
-          </div>
-
-          <!-- Maintenance Section -->
-          <div class="dashboard-card" style="border-top: 3px solid #e5e7eb;">
-            <div class="section-header">
-              <div class="section-header-icon" style="background:#374151;">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-              </div>
-              <h3 class="section-title" style="margin:0; font-size:22px;">System Maintenance</h3>
-            </div>
-            <p style="font-size:12px; color:var(--text-muted); margin-bottom:16px;">Use these tools if you encounter
-              "DENIED" errors or if meal counts need synchronization.</p>
-
-            <div style="display:flex; gap:12px; flex-wrap:wrap;">
-              <button onclick="fixSystemDatabase()"
-                style="background:var(--secondary); color:white; padding:12px 24px; border:none; font-weight:700; cursor:pointer;">1.
-                Fix Denial Restrictions (Multi-Day Meals)</button>
-              <button onclick="syncAllUserMeals()"
-                style="background:var(--dark-bg); color:white; padding:12px 24px; border:none; font-weight:700; cursor:pointer;">2.
-                Reset All to 10/10 Balance</button>
-            </div>
-            <div id="maintenanceResult" style="margin-top:16px;"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Live Feeds & Reports Page -->
-      <div id="admin-page-live-reports" class="admin-page hidden">
-        <div class="container">
-          <div class="dashboard-card">
-            <div class="section-header" style="margin-bottom:12px;">
-              <div class="section-header-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-              </div>
-              <h3 class="section-title" style="margin:0; font-size:22px;">Live Feed</h3>
-            </div>
-            <p style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">Real-time transaction updates.</p>
-            <div style="margin-bottom:16px; display: flex; gap: 12px; flex-wrap: wrap;">
-              <button onclick="printLiveFeedReport()" class="icon-btn"
-                style="background:var(--dark-bg); color:var(--primary); padding:10px 20px; border:none; cursor:pointer; border-radius:4px;">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-                Print Report
-              </button>
-              <button onclick="downloadLiveFeedPDF()" class="icon-btn"
-                style="background:#374151; color:white; padding:10px 20px; border:none; cursor:pointer; border-radius:4px;">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                Download PDF
-              </button>
-            </div>
-            <div style="overflow-x:auto;">
-              <table id="transactionTable">
-                <thead>
-                  <tr>
-                    <th>Time</th>
-                    <th>User</th>
-                    <th>Vendor</th>
-                    <th>Meal</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody id="transactionTableBody">
-                  <tr>
-                    <td colspan="5" class="loading">Loading transactions...</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <!-- Meal Reports Section -->
-          <div class="dashboard-card">
-            <div class="section-header">
-              <div class="section-header-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-              </div>
-              <h3 class="section-title" style="margin:0; font-size:22px;">Meal Reports</h3>
-            </div>
-
-            <div style="display:flex; gap:24px; flex-wrap:wrap; margin-bottom:24px;">
-              <div style="flex:1; min-width:300px;">
-                <h4 style="margin-bottom:12px; font-size:14px; text-transform:uppercase; color:var(--text-muted);">Meals
-                  Per Day</h4>
-                <div style="display:flex; gap:8px; margin-bottom:12px;">
-                  <input type="date" id="reportStartDate" style="padding:8px; border:1px solid #d1d5db;" value="">
-                  <input type="date" id="reportEndDate" style="padding:8px; border:1px solid #d1d5db;" value="">
-                  <button onclick="loadMealsPerDay()"
-                    style="background:var(--primary); color:var(--dark-bg); padding:8px 16px; border:none; font-weight:700; cursor:pointer;">Load</button>
-                </div>
-                <div id="mealsPerDayResults"
-                  style="background:white; padding:16px; border:1px solid #e5e7eb; max-height:300px; overflow-y:auto;">
-                  <p style="color:var(--text-muted); font-size:13px;">Select date range and click Load</p>
-                </div>
-              </div>
-
-              <div style="flex:1; min-width:300px;">
-                <h4 style="margin-bottom:12px; font-size:14px; text-transform:uppercase; color:var(--text-muted);">Meals
-                  Per Time (Hourly)</h4>
-                <div style="display:flex; gap:8px; margin-bottom:12px;">
-                  <input type="date" id="reportTimeDate" style="padding:8px; border:1px solid #d1d5db;">
-                  <button onclick="loadMealsPerTime()"
-                    style="background:var(--primary); color:var(--dark-bg); padding:8px 16px; border:none; font-weight:700; cursor:pointer;">Load</button>
-                </div>
-                <div id="mealsPerTimeResults"
-                  style="background:white; padding:16px; border:1px solid #e5e7eb; max-height:300px; overflow-y:auto;">
-                  <p style="color:var(--text-muted); font-size:13px;">Select a date and click Load</p>
-                </div>
+              <div style="overflow-x:auto;">
+                <table class="data-table" id="recentTransactionsTable">
+                  <thead>
+                    <tr>
+                      <th>Time</th>
+                      <th>User</th>
+                      <th>Vendor</th>
+                      <th>Meal</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="recentTransactionTableBody">
+                    <tr>
+                      <td colspan="5" class="loading" style="text-align:center; padding:2rem; color:var(--muted);">Loading overview...</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- Consolidated Report Page -->
-      <div id="admin-page-consolidated-report" class="admin-page hidden">
-        <div class="container">
-          <div class="dashboard-card">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; flex-wrap:wrap; gap:12px;">
-              <div class="section-header" style="margin:0;">
-                <div class="section-header-icon">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        <!-- Events Page -->
+        <div id="admin-page-events" class="admin-page hidden">
+          <div class="container">
+            <div class="section-card">
+              <div class="section-header">
+                <div>
+                  <h3 class="section-title">Events Management</h3>
+                  <p style="font-size:12px; color:var(--muted); margin-top:2px;">Create events, register users, generate QR codes, and export printable PDFs.</p>
                 </div>
-                <h2 class="section-title" style="margin:0;">Consolidated Meal Report</h2>
               </div>
-              <button onclick="window.print()" class="scan-btn-primary icon-btn" style="padding: 8px 16px; font-size: 12px;">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-                Print Full Page
-              </button>
-            </div>
-            <p style="font-size:12px; color:var(--text-muted); margin-bottom:24px;">This report shows all transactions
-              categorized by their respective meal periods. No data is hidden or paginated.</p>
-
-            <div id="consolidatedReportContainer">
-              <div class="loading">Loading exhaustive report...</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Daily Matrix Report Page -->
-      <div id="admin-page-daily-matrix-report" class="admin-page hidden">
-        <div class="container">
-          <div class="dashboard-card">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px; flex-wrap:wrap; gap:12px;">
-              <div class="section-header" style="margin:0;">
-                <div class="section-header-icon">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/></svg>
+              <div style="padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border);">
+                <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;">
+                  <div class="form-field" style="flex:2; min-width:200px; margin:0;">
+                    <label class="form-label">Event Name</label>
+                    <input type="text" class="form-input" id="eventName" placeholder="Campus Gala Dinner 2026">
+                  </div>
+                  <div class="form-field" style="flex:1; min-width:140px; margin:0;">
+                    <label class="form-label">Start Date</label>
+                    <input type="date" class="form-input" id="eventStartDate">
+                  </div>
+                  <div class="form-field" style="flex:1; min-width:140px; margin:0;">
+                    <label class="form-label">End Date</label>
+                    <input type="date" class="form-input" id="eventEndDate">
+                  </div>
+                  <button class="btn btn-accent" onclick="createNewEvent()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Create Event
+                  </button>
                 </div>
-                <h2 class="section-title" style="margin:0;">Daily Matrix Report</h2>
               </div>
-              <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-                <input type="date" id="matrixStartDate" style="padding:8px; border:1px solid #d1d5db; border-radius:4px;">
-                <input type="date" id="matrixEndDate" style="padding:8px; border:1px solid #d1d5db; border-radius:4px;">
-                <button onclick="loadDailyMatrixReport()" class="scan-btn-primary icon-btn" style="padding: 8px 14px;">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.96"/></svg>
-                  Load
-                </button>
-                <button onclick="printDailyMatrixReport()" class="scan-btn-primary icon-btn"
-                  style="padding: 8px 14px; background:var(--dark-bg); color:var(--primary);">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-                  Print
-                </button>
-              </div>
+              <div style="padding:0;" id="eventsList"></div>
             </div>
-            <p style="font-size:12px; color:var(--text-muted); margin-bottom:24px;">This report provides a summarized
-              view of meals served each day, categorized by meal type.</p>
 
-            <div id="dailyMatrixContainer" style="overflow-x: auto;">
-              <div class="loading">Select dates and click Load...</div>
+            <div class="section-card hidden" id="eventDetailCard">
+              <div class="section-header">
+                <h3 class="section-title" id="eventDetailTitle">Event Details</h3>
+                <button class="btn btn-sm" onclick="closeEventDetail()">← Back to Events</button>
+              </div>
+              <div style="padding: 1.5rem;" id="eventDetailContent"></div>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- Meal Schedule Page -->
-      <div id="admin-page-meal-schedule" class="admin-page hidden">
-        <div class="container">
-          <div class="dashboard-card">
-            <div class="section-header">
-              <div class="section-header-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <!-- User Database Page -->
+        <div id="admin-page-users" class="admin-page hidden">
+          <div class="container">
+            <div class="section-card">
+              <div class="section-header">
+                <div>
+                  <h3 class="section-title">User Database</h3>
+                  <p style="font-size:12px; color:var(--muted); margin-top:2px;">Manage participant records, registration numbers, and accommodation statuses.</p>
+                </div>
               </div>
-              <h3 class="section-title" style="margin:0; font-size:22px;">Meal Schedule</h3>
-            </div>
-            <p style="font-size:12px; color:var(--text-muted); margin-bottom:20px;">Edit meal period names and time windows. Changes take effect immediately for QR validation and vendor scanning.</p>
+              <div style="padding: 1.25rem 1.5rem;">
+                <!-- CSV Import Zone -->
+                <div id="importSection" style="margin-bottom:1.5rem;">
+                  <div id="importDropZone"
+                    style="border:2px dashed var(--border-md); border-radius:var(--radius); padding:20px; text-align:center; cursor:pointer; transition:all 0.2s; background:var(--bg);"
+                    ondragover="event.preventDefault(); this.style.borderColor='var(--accent)';"
+                    ondragleave="this.style.borderColor='var(--border-md)';"
+                    ondrop="event.preventDefault(); this.style.borderColor='var(--border-md)'; handleFileDrop(event)"
+                    onclick="document.getElementById('importFileInput').click()">
+                    <input type="file" id="importFileInput" accept=".csv,.tsv,.txt,.xls,.xlsx" style="display:none" onchange="handleFileSelect(event)">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.5" style="margin-bottom:6px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    <p style="font-size:13px; color:var(--text); font-weight:600; margin-bottom:2px;">Drop CSV, TSV, or TXT file here to bulk import</p>
+                    <p style="font-size:11px; color:var(--muted);">Auto-detects names, REG numbers, PINs, and accommodation types</p>
+                  </div>
+                  <div id="importPreview" class="hidden" style="margin-top:12px; padding:16px; background:var(--bg); border-radius:var(--radius); border:1px solid var(--border);">
+                    <div id="importPreviewContent"></div>
+                    <div style="display:flex; gap:8px; margin-top:12px; justify-content:flex-end;">
+                      <button onclick="cancelImport()" class="btn btn-sm">Cancel</button>
+                      <button onclick="confirmImport()" id="confirmImportBtn" class="btn btn-sm btn-success">Import Users</button>
+                    </div>
+                  </div>
+                  <div id="importResult" class="hidden" style="margin-top:12px; padding:12px; border-radius:8px; font-size:13px;"></div>
+                </div>
 
-            <div id="mealScheduleContainer" style="display:grid; gap:16px;">
-              <div class="loading">Loading meal types...</div>
+                <div class="search-input-wrap" style="margin-bottom:1rem;">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                  <input type="text" id="userDbSearch" oninput="filterUserTable()" placeholder="Search by name or registration number...">
+                </div>
+
+                <div style="overflow-x:auto;">
+                  <table class="data-table" id="usersTable">
+                    <thead>
+                      <tr>
+                        <th style="width:40px;"><input type="checkbox" id="selectAllUsers" onchange="toggleAllUsers(this)"></th>
+                        <th>REG #</th>
+                        <th>Name</th>
+                        <th>Accommodation</th>
+                        <th>Status</th>
+                        <th>Generated Token</th>
+                        <th>Expiry</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="usersTableBody">
+                      <tr>
+                        <td colspan="8" class="loading" style="text-align:center; padding:2rem; color:var(--muted);">Loading users...</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
 
-            <div id="mealScheduleResult" style="margin-top:16px;"></div>
+            <!-- Edit Meal Modal Overlay -->
+            <div class="modal-overlay hidden" id="editMealCard">
+              <div class="modal-content" style="max-width:560px;">
+                <div class="modal-header">
+                  <div class="modal-title">Edit Allocation</div>
+                  <button class="modal-close" onclick="cancelEditMeals()" style="background:none; border:none; font-size:20px; cursor:pointer;">×</button>
+                </div>
+                <div class="modal-body">
+                  <div id="editUserInfo"></div>
+                  <div id="editMealForm" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px;"></div>
+                </div>
+                <div class="modal-footer">
+                  <button class="btn btn-sm" onclick="cancelEditMeals()">Cancel</button>
+                  <button class="btn btn-sm btn-success" onclick="saveEditedMeals()">Save Changes</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Bulk Allocation Card -->
+            <div class="section-card">
+              <div class="section-header">
+                <h3 class="section-title">Bulk Meal Allocation</h3>
+              </div>
+              <div style="padding: 1.25rem 1.5rem;">
+                <p style="font-size:12px; color:var(--muted); margin-bottom:1rem;">Allocate meals to selected users or all users in batch.</p>
+
+                <div style="display:flex; gap:16px; flex-wrap:wrap; margin-bottom:1rem;">
+                  <div class="form-field" style="flex:1; min-width:180px;">
+                    <label class="form-label">Meal Type</label>
+                    <select class="form-select" id="allocMealType">
+                      <option value="">Select meal type...</option>
+                    </select>
+                  </div>
+                  <div class="form-field" style="flex:1; min-width:180px;">
+                    <label class="form-label">Operation</label>
+                    <select class="form-select" id="allocOperation">
+                      <option value="add">Add Meals</option>
+                      <option value="set">Set Meals</option>
+                      <option value="reset">Reset to Default (Y=12 / N=4)</option>
+                    </select>
+                  </div>
+                  <div class="form-field" style="flex:1; min-width:140px;">
+                    <label class="form-label">Amount</label>
+                    <input type="number" class="form-input" id="allocAmount" value="10" min="0" max="999">
+                  </div>
+                </div>
+
+                <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                  <button class="btn btn-success" onclick="allocateToSelected()">Allocate to Selected Users</button>
+                  <button class="btn btn-primary" onclick="allocateToAll()">Allocate to ALL Users</button>
+                </div>
+
+                <div id="allocResult" style="margin-top:1rem;"></div>
+              </div>
+            </div>
+
+            <!-- Maintenance Section -->
+            <div class="section-card">
+              <div class="section-header">
+                <h3 class="section-title">System Maintenance</h3>
+              </div>
+              <div style="padding: 1.25rem 1.5rem;">
+                <p style="font-size:12px; color:var(--muted); margin-bottom:1rem;">Tools for synchronization and database health checks.</p>
+
+                <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                  <button class="btn" onclick="fixSystemDatabase()">1. Fix Denial Restrictions (Multi-Day Meals)</button>
+                  <button class="btn" onclick="syncAllUserMeals()">2. Reset All to 10/10 Balance</button>
+                </div>
+                <div id="maintenanceResult" style="margin-top:1rem;"></div>
+              </div>
+            </div>
+
           </div>
         </div>
+
+        <!-- Live Feeds Page -->
+        <div id="admin-page-live-reports" class="admin-page hidden">
+          <div class="container">
+            <div class="section-card">
+              <div class="section-header">
+                <div>
+                  <h3 class="section-title">Live Transaction Feed</h3>
+                  <p style="font-size:12px; color:var(--muted); margin-top:2px;">Real-time transaction updates from all scanner terminals.</p>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                  <button class="btn btn-sm" onclick="printLiveFeedReport()">Print Report</button>
+                  <button class="btn btn-sm btn-primary" onclick="downloadLiveFeedPDF()">Download PDF</button>
+                </div>
+              </div>
+              <div style="overflow-x:auto;">
+                <table class="data-table" id="transactionTable">
+                  <thead>
+                    <tr>
+                      <th>Time</th>
+                      <th>User</th>
+                      <th>Vendor</th>
+                      <th>Meal</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="transactionTableBody">
+                    <tr>
+                      <td colspan="5" class="loading" style="text-align:center; padding:2rem; color:var(--muted);">Loading transactions...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Meal Reports Card -->
+            <div class="section-card">
+              <div class="section-header">
+                <h3 class="section-title">Meal Analytical Reports</h3>
+              </div>
+              <div style="padding: 1.25rem 1.5rem;">
+                <div style="display:flex; gap:24px; flex-wrap:wrap;">
+                  <div style="flex:1; min-width:280px;">
+                    <h4 style="margin-bottom:10px; font-size:13px; text-transform:uppercase; color:var(--muted); font-weight:600;">Meals Per Day</h4>
+                    <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
+                      <input type="date" class="form-input" id="reportStartDate" style="flex:1;">
+                      <input type="date" class="form-input" id="reportEndDate" style="flex:1;">
+                      <button class="btn btn-accent" onclick="loadMealsPerDay()">Load</button>
+                    </div>
+                    <div id="mealsPerDayResults" style="background:var(--bg); padding:14px; border-radius:var(--radius); border:1px solid var(--border); max-height:300px; overflow-y:auto;">
+                      <p style="color:var(--muted); font-size:13px;">Select date range and click Load</p>
+                    </div>
+                  </div>
+
+                  <div style="flex:1; min-width:280px;">
+                    <h4 style="margin-bottom:10px; font-size:13px; text-transform:uppercase; color:var(--muted); font-weight:600;">Meals Per Time (Hourly)</h4>
+                    <div style="display:flex; gap:8px; margin-bottom:12px;">
+                      <input type="date" class="form-input" id="reportTimeDate" style="flex:1;">
+                      <button class="btn btn-accent" onclick="loadMealsPerTime()">Load</button>
+                    </div>
+                    <div id="mealsPerTimeResults" style="background:var(--bg); padding:14px; border-radius:var(--radius); border:1px solid var(--border); max-height:300px; overflow-y:auto;">
+                      <p style="color:var(--muted); font-size:13px;">Select a date and click Load</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Consolidated Report Page -->
+        <div id="admin-page-consolidated-report" class="admin-page hidden">
+          <div class="container">
+            <div class="section-card">
+              <div class="section-header">
+                <div>
+                  <h3 class="section-title">Consolidated Meal Report</h3>
+                  <p style="font-size:12px; color:var(--muted); margin-top:2px;">Exhaustive transaction records grouped by meal periods.</p>
+                </div>
+                <button class="btn btn-sm btn-primary" onclick="window.print()">Print Report</button>
+              </div>
+              <div style="padding: 1.5rem;" id="consolidatedReportContainer">
+                <div class="loading" style="text-align:center; color:var(--muted);">Loading report...</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Daily Matrix Report Page -->
+        <div id="admin-page-daily-matrix-report" class="admin-page hidden">
+          <div class="container">
+            <div class="section-card">
+              <div class="section-header">
+                <div>
+                  <h3 class="section-title">Daily Matrix Report</h3>
+                  <p style="font-size:12px; color:var(--muted); margin-top:2px;">Cross-tabulated view of meals served daily per category.</p>
+                </div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                  <input type="date" class="form-input" id="matrixStartDate">
+                  <input type="date" class="form-input" id="matrixEndDate">
+                  <button class="btn btn-accent" onclick="loadDailyMatrixReport()">Load</button>
+                  <button class="btn btn-primary" onclick="printDailyMatrixReport()">Print</button>
+                </div>
+              </div>
+              <div style="padding: 1.25rem 1.5rem; overflow-x: auto;" id="dailyMatrixContainer">
+                <div class="loading" style="text-align:center; color:var(--muted);">Select dates and click Load...</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Meal Schedule Page -->
+        <div id="admin-page-meal-schedule" class="admin-page hidden">
+          <div class="container">
+            <div class="section-card">
+              <div class="section-header">
+                <div>
+                  <h3 class="section-title">Meal Schedule Configuration</h3>
+                  <p style="font-size:12px; color:var(--muted); margin-top:2px;">Edit meal period names and active serving windows.</p>
+                </div>
+              </div>
+              <div style="padding: 1.5rem;" id="mealScheduleContainer">
+                <div class="loading" style="text-align:center; color:var(--muted);">Loading meal types...</div>
+              </div>
+              <div id="mealScheduleResult" style="padding: 0 1.5rem 1.5rem 1.5rem;"></div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
@@ -1430,13 +601,17 @@
     let adminRefreshInterval = null;
 
     // API Call Helper
-    async function apiCall(endpoint, method = 'GET', body = null) {
+    async function apiCall(endpoint, method = 'GET', body = null, timeoutMs = 20000) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+
       const options = {
         method,
         headers: {
           'Content-Type': 'application/json',
           ...(sessionToken && { 'Authorization': `Bearer ${sessionToken}` })
-        }
+        },
+        signal: controller.signal
       };
 
       if (body) options.body = JSON.stringify(body);
@@ -1451,22 +626,29 @@
 
         return data;
       } catch (err) {
+        if (err.name === 'AbortError') {
+          throw new Error('Request timed out');
+        }
         console.error('API error:', err);
         throw err;
+      } finally {
+        clearTimeout(timer);
       }
     }
 
     function playBeep() {
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(880, audioCtx.currentTime);
-      gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-      osc.start();
-      osc.stop(audioCtx.currentTime + 0.1);
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.1);
+      } catch (e) {}
     }
 
     // Auth
@@ -1531,29 +713,44 @@
 
         showDashboard();
       } catch (err) {
-        errorMsg.innerHTML = `<span style="display:inline-flex;align-items:center;gap:6px;"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> ${err.message}</span>`;
+        errorMsg.innerHTML = `<span style="display:inline-flex;align-items:center;gap:6px;"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> ${err.message}</span>`;
         errorMsg.classList.remove('hidden');
       } finally {
         btn.disabled = false;
       }
     }
 
-    function showError(msg) {
-      alert(msg);
-    }
+    function showError(msg) { alert(msg); }
 
-    async function logout() {
-      if (html5QrcodeScanner) stopScanner();
-      try {
-        await apiCall('/auth/logout', 'POST');
-      } catch (err) {
-        console.error('Logout error:', err);
+    function logout() {
+      if (adminRefreshInterval) {
+        clearInterval(adminRefreshInterval);
+        adminRefreshInterval = null;
       }
+      try { stopScanner(); } catch (e) {}
+
+      const token = sessionToken;
       sessionToken = null;
       currentSession = null;
+
       document.getElementById('loginPage').classList.remove('hidden');
       document.getElementById('appContainer').classList.add('hidden');
+      document.getElementById('appSidebar').classList.add('hidden');
+      document.getElementById('mainWrapper').style.marginLeft = '0';
       document.getElementById('qrDisplay').classList.add('hidden');
+
+      if (token) {
+        const controller = new AbortController();
+        setTimeout(() => controller.abort(), 5000);
+        fetch(`${API_BASE}/auth/logout`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          signal: controller.signal
+        }).catch(() => {});
+      }
     }
 
     function showDashboard() {
@@ -1561,17 +758,28 @@
       document.getElementById('appContainer').classList.remove('hidden');
       ['userDashboard', 'vendorDashboard', 'adminDashboard'].forEach(id => document.getElementById(id).classList.add('hidden'));
 
+      const sidebar = document.getElementById('appSidebar');
+      const wrapper = document.getElementById('mainWrapper');
+
+      if (currentSession.role === 'admin') {
+        sidebar.classList.remove('hidden');
+        wrapper.style.marginLeft = 'var(--sidebar-w)';
+      } else {
+        sidebar.classList.add('hidden');
+        wrapper.style.marginLeft = '0';
+      }
+
       const displayMap = { 'user': 'userDashboard', 'vendor': 'vendorDashboard', 'admin': 'adminDashboard' };
       document.getElementById(displayMap[currentSession.role]).classList.remove('hidden');
 
       const displayName = currentSession.name || currentSession.username || 'User';
       document.getElementById('userDisplay').textContent = `${displayName}`;
+      document.getElementById('sidebarName').textContent = displayName;
 
       if (currentSession.role === 'user') renderUserDashboard();
       if (currentSession.role === 'vendor') renderVendorDashboard();
       if (currentSession.role === 'admin') {
         renderAdminDashboard();
-        // Load initial data for the current active page
         const activeTab = document.querySelector('.admin-tab.active');
         if (activeTab) {
           const page = activeTab.getAttribute('data-page');
@@ -1593,15 +801,15 @@
         const qrBtn = document.getElementById('qrBtn');
 
         if (activeMeal) {
-          statusEl.textContent = 'Active Now';
+          statusEl.innerHTML = '<span class="status-dot"></span> Active Serving';
           statusEl.className = 'status-badge active';
           document.getElementById('activeMealName').textContent = activeMeal.name;
           document.getElementById('qrSection').classList.remove('hidden');
           qrBtn.disabled = false;
         } else {
-          statusEl.textContent = 'Inactive';
+          statusEl.innerHTML = '<span class="status-dot"></span> Inactive';
           statusEl.className = 'status-badge inactive';
-          document.getElementById('activeMealName').textContent = 'No Meal Period';
+          document.getElementById('activeMealName').textContent = 'No Active Meal Period';
           document.getElementById('qrSection').classList.add('hidden');
         }
 
@@ -1609,14 +817,14 @@
         meals.forEach(meal => {
           const isActive = activeMeal && activeMeal.id === meal.id;
           html += `
-        <div class="meal-card ${isActive ? 'active' : ''}">
-          <div class="meal-card-name">${meal.name}</div>
-          <div class="meal-card-count">${meal.remaining || 0}</div>
-          <div class="meal-card-time">
-            <span>🕐</span> ${meal.start_time} - ${meal.end_time}
-          </div>
-        </div>
-      `;
+            <div class="meal-card ${isActive ? 'active' : ''}">
+              <div class="meal-card-name">${meal.name}</div>
+              <div class="meal-card-count">${meal.remaining || 0}</div>
+              <div class="meal-card-time">
+                <span>🕐</span> ${meal.start_time} - ${meal.end_time}
+              </div>
+            </div>
+          `;
         });
         document.getElementById('mealCards').innerHTML = html;
       } catch (err) {
@@ -1660,17 +868,6 @@
       }
     }
 
-    function copyToken() {
-      const tokenText = document.getElementById('tokenDisplay').textContent;
-      if (tokenText && tokenText !== '(Token will appear here)') {
-        navigator.clipboard.writeText(tokenText).then(() => {
-          alert('✅ Token copied to clipboard!');
-        }).catch(() => {
-          alert('Could not copy. Please copy manually.');
-        });
-      }
-    }
-
     // Vendor Dashboard
     async function renderVendorDashboard() {
       try {
@@ -1682,28 +879,28 @@
         const statusBox = document.getElementById('mealStatusBox');
         if (activeMeal) {
           statusBox.innerHTML = `
-        <div class="summary-box" style="margin-bottom:0; border:2px solid var(--success);">
-          <div class="summary-left">
-            <p>Current Serving</p>
-            <div class="meal-name-display" style="color:var(--success);">${activeMeal.name}</div>
-          </div>
-          <div class="summary-right">
-            <div class="status-badge active">System Online</div>
-          </div>
-        </div>
-      `;
+            <div class="summary-box" style="margin-bottom:0; border:1.5px solid var(--success);">
+              <div class="summary-left">
+                <p>Current Serving Period</p>
+                <div class="meal-name-display" style="font-family:'Anton',sans-serif; font-size:22px; color:var(--success); font-weight:400; text-transform:uppercase;">${activeMeal.name}</div>
+              </div>
+              <div class="summary-right">
+                <span class="status-badge active"><span class="status-dot"></span> System Online</span>
+              </div>
+            </div>
+          `;
         } else {
           statusBox.innerHTML = `
-        <div class="summary-box" style="margin-bottom:0; background:#f3f4f6;">
-          <div class="summary-left">
-            <p>Status</p>
-            <div class="meal-name-display" style="color:#6b7280;">No Active Meal</div>
-          </div>
-          <div class="summary-right">
-            <div class="status-badge inactive">Standby</div>
-          </div>
-        </div>
-      `;
+            <div class="summary-box" style="margin-bottom:0; background:var(--bg);">
+              <div class="summary-left">
+                <p>Status</p>
+                <div class="meal-name-display" style="font-family:'Anton',sans-serif; font-size:20px; color:var(--muted); text-transform:uppercase;">No Active Meal</div>
+              </div>
+              <div class="summary-right">
+                <span class="status-badge inactive"><span class="status-dot"></span> Standby</span>
+              </div>
+            </div>
+          `;
         }
 
         const selector = document.getElementById('mealTypeSelector');
@@ -1713,14 +910,10 @@
           selector.classList.remove('hidden');
           selectedMealTypeId = activeMeal ? activeMeal.id : (mealTypes[0] ? mealTypes[0].id : null);
           buttons.innerHTML = mealTypes.map(m => `
-        <button type="button" data-meal-id="${m.id}" onclick="selectMealType('${m.id}')" 
-                style="padding:10px 20px; border:2px solid ${selectedMealTypeId === m.id ? 'var(--primary)' : '#d1d5db'}; 
-                       background:${selectedMealTypeId === m.id ? 'var(--primary)' : 'white'}; 
-                       color:${selectedMealTypeId === m.id ? 'var(--dark-bg)' : 'var(--text-main)'}; 
-                       font-weight:600; cursor:pointer;">
-          ${m.name}
-        </button>
-      `).join('');
+            <button type="button" class="btn ${selectedMealTypeId === m.id ? 'btn-accent' : ''}" data-meal-id="${m.id}" onclick="selectMealType('${m.id}')">
+              ${m.name}
+            </button>
+          `).join('');
         } else {
           selector.classList.add('hidden');
         }
@@ -1733,9 +926,7 @@
       selectedMealTypeId = id;
       document.querySelectorAll('#mealTypeButtons button').forEach(btn => {
         const isSelected = btn.getAttribute('data-meal-id') === id;
-        btn.style.border = isSelected ? '2px solid var(--primary)' : '2px solid #d1d5db';
-        btn.style.background = isSelected ? 'var(--primary)' : 'white';
-        btn.style.color = isSelected ? 'var(--dark-bg)' : 'var(--text-main)';
+        btn.className = `btn ${isSelected ? 'btn-accent' : ''}`;
       });
     }
 
@@ -1745,10 +936,8 @@
       document.getElementById('stopScanBtn').classList.remove('hidden');
       document.getElementById('scanResult').classList.add('hidden');
 
-      console.log('🎥 Starting camera...');
-
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        showError('❌ Camera not supported in this browser.\n\nTry Chrome or Firefox.\nOr use "Manual Entry" below.');
+        showError('❌ Camera not supported in this browser.\nUse "Manual Entry" below.');
         stopScanner();
         return;
       }
@@ -1756,30 +945,9 @@
       html5QrcodeScanner = new Html5Qrcode('reader');
       const config = { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1 };
 
-      html5QrcodeScanner.start({ facingMode: 'environment' }, config, onScanSuccess, (error) => {
-        if (!error.toString().includes('No MultiFormat Readers')) {
-          console.warn('Scanner:', error);
-        }
-      })
-        .then(() => {
-          console.log('✅ Camera started');
-        })
+      html5QrcodeScanner.start({ facingMode: 'environment' }, config, onScanSuccess, (error) => {})
         .catch(err => {
-          console.error('❌ Camera error:', err);
-
-          let errorMsg = '❌ Camera Error\n\n';
-
-          if (err.name === 'NotAllowedError') {
-            errorMsg += 'Permission Denied!\n\n1. Check browser asked for camera permission\n2. Click "Allow"\n3. Refresh page\n4. Try again\n\nOr use "Manual Entry" below.';
-          } else if (err.name === 'NotFoundError') {
-            errorMsg += 'No Camera Found!\n\n1. Check camera is connected\n2. Check camera is enabled\n\nOr use "Manual Entry" below.';
-          } else if (err.name === 'NotSupportedError') {
-            errorMsg += 'Camera Not Supported!\n\nTry Chrome or Firefox\n\nOr use "Manual Entry" below.';
-          } else {
-            errorMsg += 'Camera Error: ' + err.name + '\n\nUse "Manual Entry" below.';
-          }
-
-          showError(errorMsg);
+          showError('Camera Error: ' + err.name + '\nUse "Manual Entry" below.');
           stopScanner();
         });
     }
@@ -1828,27 +996,27 @@
 
       resultDiv.className = `scan-result ${status}`;
 
-      // Style for the result box depending on status
       if (status === 'approved') {
-        resultDiv.style.border = "2px solid var(--success)";
-        resultDiv.style.background = "#dcfce7";
-        resultDiv.style.color = "#166534";
+        resultDiv.style.border = "1px solid #6EE7B7";
+        resultDiv.style.background = "#D1FAE5";
+        resultDiv.style.color = "#065F46";
       } else {
-        resultDiv.style.border = "2px solid var(--error)";
-        resultDiv.style.background = "#fee2e2";
-        resultDiv.style.color = "#991b1b";
+        resultDiv.style.border = "1px solid #FCA5A5";
+        resultDiv.style.background = "#FEE2E2";
+        resultDiv.style.color = "#991B1B";
       }
-      resultDiv.style.padding = "24px";
-      resultDiv.style.marginTop = "24px";
+      resultDiv.style.padding = "18px";
+      resultDiv.style.marginTop = "20px";
+      resultDiv.style.borderRadius = "12px";
 
       resultDiv.innerHTML = `
-    <div class="result-header" style="display:flex; align-items:center; gap:12px;">
-      <span class="result-icon" style="font-size:24px;">${icon}</span>
-      <span class="result-title" style="font-size:20px; font-weight:700; font-family:'Anton', sans-serif;">${status === 'approved' ? 'APPROVED' : 'DENIED'}</span>
-    </div>
-    <p style="font-size:16px; font-weight:500; margin-top:8px;">${message}</p>
-    ${remaining !== undefined ? `<p style="margin-top:8px; font-size:14px;">Meals Remaining: <strong>${remaining}</strong></p>` : ''}
-  `;
+        <div class="result-header" style="display:flex; align-items:center; gap:10px;">
+          <span style="font-size:22px;">${icon}</span>
+          <span style="font-size:18px; font-weight:700; font-family:'Anton', sans-serif;">${status === 'approved' ? 'APPROVED' : 'DENIED'}</span>
+        </div>
+        <p style="font-size:14px; font-weight:500; margin-top:6px;">${message}</p>
+        ${remaining !== undefined ? `<p style="margin-top:6px; font-size:13px;">Meals Remaining: <strong>${remaining}</strong></p>` : ''}
+      `;
 
       resultDiv.classList.remove('hidden');
 
@@ -1859,8 +1027,18 @@
       }
     }
 
-    // Admin Page Navigation
+    // Admin Navigation
     let currentAdminPage = 'daily-summary';
+
+    const pageTitles = {
+      'daily-summary': "Daily Overview",
+      'events': "Events Management",
+      'users': "User Database & Allocations",
+      'live-reports': "Live Feeds & Activity",
+      'consolidated-report': "Consolidated Meal Report",
+      'daily-matrix-report': "Daily Matrix Report",
+      'meal-schedule': "Meal Schedule Configuration"
+    };
 
     function showAdminPage(pageName) {
       currentAdminPage = pageName;
@@ -1879,6 +1057,11 @@
       const targetPage = document.getElementById(`admin-page-${pageName}`);
       if (targetPage) {
         targetPage.classList.remove('hidden');
+      }
+
+      const topbarTitle = document.getElementById('topbarTitle');
+      if (topbarTitle && pageTitles[pageName]) {
+        topbarTitle.textContent = pageTitles[pageName];
       }
 
       if (pageName === 'daily-summary') {
@@ -1901,42 +1084,42 @@
 
     async function loadMealSchedule() {
       const container = document.getElementById('mealScheduleContainer');
-      container.innerHTML = '<div class="loading">Loading meal types...</div>';
+      container.innerHTML = '<div class="loading" style="text-align:center; padding:1.5rem; color:var(--muted);">Loading meal types...</div>';
       try {
         const mealTypes = await apiCall('/admin/meal-types');
         if (!mealTypes || mealTypes.length === 0) {
-          container.innerHTML = '<p style="color:var(--text-muted);">No meal types configured.</p>';
+          container.innerHTML = '<p style="color:var(--muted);">No meal types configured.</p>';
           return;
         }
         let html = '';
         mealTypes.forEach(mt => {
           const isActive = mt.active === 1;
           html += `
-          <div style="background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 16px; align-items: end;">
-            <div>
-              <label style="font-size:10px; text-transform:uppercase; font-weight:700; color:var(--text-muted); display:block; margin-bottom:4px;">Meal Name</label>
-              <input type="text" id="mt_name_${mt.id}" value="${mt.name}" style="width:100%; padding:10px; border:1px solid #d1d5db; border-radius:4px; font-size:14px; font-weight:600;">
-            </div>
-            <div>
-              <label style="font-size:10px; text-transform:uppercase; font-weight:700; color:var(--text-muted); display:block; margin-bottom:4px;">Start Time</label>
-              <input type="time" id="mt_start_${mt.id}" value="${mt.start_time}" style="width:100%; padding:10px; border:1px solid #d1d5db; border-radius:4px; font-size:14px;">
-            </div>
-            <div>
-              <label style="font-size:10px; text-transform:uppercase; font-weight:700; color:var(--text-muted); display:block; margin-bottom:4px;">End Time</label>
-              <input type="time" id="mt_end_${mt.id}" value="${mt.end_time}" style="width:100%; padding:10px; border:1px solid #d1d5db; border-radius:4px; font-size:14px;">
-            </div>
-            <div style="display:flex; gap:8px; align-items:center; padding-bottom:2px;">
-              <label style="font-size:12px; font-weight:600; color:var(--text-main); cursor:pointer; display:flex; align-items:center; gap:6px;">
-                <input type="checkbox" id="mt_active_${mt.id}" ${isActive ? 'checked' : ''} style="width:16px; height:16px;">
-                Active
-              </label>
-              <button onclick="saveMealType('${mt.id}')" style="background:var(--success); color:white; padding:10px 20px; border:none; border-radius:4px; font-weight:700; cursor:pointer; font-size:13px; white-space:nowrap;">Save</button>
-            </div>
-          </div>`;
+            <div style="background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; margin-bottom:1rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)) auto; gap: 14px; align-items: end;">
+              <div class="form-field" style="margin:0;">
+                <label class="form-label">Meal Name</label>
+                <input type="text" class="form-input" id="mt_name_${mt.id}" value="${mt.name}">
+              </div>
+              <div class="form-field" style="margin:0;">
+                <label class="form-label">Start Time</label>
+                <input type="time" class="form-input" id="mt_start_${mt.id}" value="${mt.start_time}">
+              </div>
+              <div class="form-field" style="margin:0;">
+                <label class="form-label">End Time</label>
+                <input type="time" class="form-input" id="mt_end_${mt.id}" value="${mt.end_time}">
+              </div>
+              <div style="display:flex; gap:12px; align-items:center; height:38px;">
+                <label style="font-size:13px; font-weight:500; cursor:pointer; display:flex; align-items:center; gap:6px;">
+                  <input type="checkbox" id="mt_active_${mt.id}" ${isActive ? 'checked' : ''} style="width:16px; height:16px;">
+                  Active
+                </label>
+                <button class="btn btn-sm btn-success" onclick="saveMealType('${mt.id}')">Save</button>
+              </div>
+            </div>`;
         });
         container.innerHTML = html;
       } catch (err) {
-        container.innerHTML = `<p style="color:var(--error);">Error loading meal types: ${err.message}</p>`;
+        container.innerHTML = `<p style="color:var(--danger);">Error loading meal types: ${err.message}</p>`;
       }
     }
 
@@ -1947,47 +1130,39 @@
       const endTime = document.getElementById(`mt_end_${id}`).value;
       const active = document.getElementById(`mt_active_${id}`).checked;
 
-      if (!name) {
-        resultDiv.innerHTML = '<p style="color:var(--error);">Meal name cannot be empty.</p>';
-        return;
-      }
-      if (!startTime || !endTime) {
-        resultDiv.innerHTML = '<p style="color:var(--error);">Start and end times are required.</p>';
-        return;
-      }
-      if (startTime >= endTime) {
-        resultDiv.innerHTML = '<p style="color:var(--error);">Start time must be before end time.</p>';
+      if (!name || !startTime || !endTime) {
+        resultDiv.innerHTML = '<p style="color:var(--danger);">All fields are required.</p>';
         return;
       }
 
       try {
-        resultDiv.innerHTML = '<p style="color:var(--text-muted);">Saving...</p>';
+        resultDiv.innerHTML = '<p style="color:var(--muted);">Saving...</p>';
         await apiCall(`/admin/meal-types/${id}`, 'PUT', { name, startTime, endTime, active });
         resultDiv.innerHTML = `<p style="color:var(--success);">Meal type "${name}" updated successfully.</p>`;
         setTimeout(() => { resultDiv.innerHTML = ''; }, 3000);
       } catch (err) {
-        resultDiv.innerHTML = `<p style="color:var(--error);">Error: ${err.message}</p>`;
+        resultDiv.innerHTML = `<p style="color:var(--danger);">Error: ${err.message}</p>`;
       }
     }
 
     async function renderConsolidatedReport() {
       const container = document.getElementById('consolidatedReportContainer');
-      container.innerHTML = '<div class="loading">Generating full report...</div>';
+      container.innerHTML = '<div class="loading" style="text-align:center; padding:1.5rem; color:var(--muted);">Generating full report...</div>';
 
       try {
         const data = await apiCall('/admin/consolidated-report');
         const { mealTypes, grouped, totalCount } = data;
 
         let html = `
-          <div style="margin-bottom: 24px; padding: 16px; background: var(--bg-color); border-left: 4px solid var(--primary);">
+          <div style="margin-bottom: 1.5rem; padding: 1.25rem; background: var(--bg); border-left: 4px solid var(--accent); border-radius:var(--radius);">
             <div style="display: flex; justify-content: space-between; align-items: center;">
               <div>
-                <p style="font-size: 12px; text-transform: uppercase; color: var(--text-muted);">Total Transactions Records</p>
-                <p style="font-size: 32px; font-family: 'Anton', sans-serif; color: var(--text-main);">${totalCount}</p>
+                <p style="font-size: 11px; font-weight:600; text-transform: uppercase; color: var(--muted); letter-spacing:0.8px;">Total Transactions Recorded</p>
+                <p style="font-size: 32px; font-family: 'Anton', sans-serif; color: var(--text);">${totalCount}</p>
               </div>
               <div style="text-align: right;">
-                <p style="font-size: 12px; text-transform: uppercase; color: var(--text-muted);">Report Date</p>
-                <p style="font-size: 14px; font-weight: 700;">${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}</p>
+                <p style="font-size: 11px; font-weight:600; text-transform: uppercase; color: var(--muted); letter-spacing:0.8px;">Report Date</p>
+                <p style="font-size: 13px; font-weight: 600;">${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}</p>
               </div>
             </div>
           </div>
@@ -1998,43 +1173,43 @@
           const txs = group.transactions;
 
           html += `
-            <div class="meal-period-section" style="margin-bottom: 40px;">
-              <div style="display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid var(--dark-bg); padding-bottom: 8px; margin-bottom: 16px;">
-                <h3 style="margin: 0; font-family: 'Anton', sans-serif; font-size: 24px; color: var(--dark-bg);">${group.meal_type.toUpperCase()}</h3>
-                <span style="font-size: 12px; font-weight: 700; color: var(--text-muted);">${group.time_range} | ${txs.length} transactions</span>
+            <div class="meal-period-section" style="margin-bottom: 2.5rem;">
+              <div style="display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid var(--text); padding-bottom: 8px; margin-bottom: 1rem;">
+                <h3 style="margin: 0; font-family: 'Anton', sans-serif; font-size: 20px; color: var(--text);">${group.meal_type.toUpperCase()}</h3>
+                <span style="font-size: 12px; font-weight: 600; color: var(--muted);">${group.time_range} | ${txs.length} transactions</span>
               </div>
-              
+
               <div style="overflow-x: auto;">
-                <table style="width: 100%; border-collapse: collapse;">
+                <table class="data-table">
                   <thead>
                     <tr>
-                      <th style="background: #f3f4f6; color: var(--dark-bg); font-size: 11px;">#</th>
-                      <th style="background: #f3f4f6; color: var(--dark-bg); font-size: 11px;">Date/Time</th>
-                      <th style="background: #f3f4f6; color: var(--dark-bg); font-size: 11px;">Registration #</th>
-                      <th style="background: #f3f4f6; color: var(--dark-bg); font-size: 11px;">Name</th>
-                      <th style="background: #f3f4f6; color: var(--dark-bg); font-size: 11px;">Vendor</th>
-                      <th style="background: #f3f4f6; color: var(--dark-bg); font-size: 11px;">Mode</th>
+                      <th style="width:40px;">#</th>
+                      <th>Date/Time</th>
+                      <th>REG #</th>
+                      <th>Name</th>
+                      <th>Vendor</th>
+                      <th>Mode</th>
                     </tr>
                   </thead>
                   <tbody>
           `;
 
           if (txs.length === 0) {
-            html += `<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--text-muted);">No transactions for this meal period.</td></tr>`;
+            html += `<tr><td colspan="6" style="text-align: center; padding: 1.5rem; color: var(--muted);">No transactions for this meal period.</td></tr>`;
           } else {
             txs.forEach((tx, index) => {
               html += `
                 <tr>
-                  <td>${index + 1}</td>
+                  <td class="td-no">${index + 1}</td>
                   <td>${tx.transaction_date} ${tx.transaction_time}</td>
-                  <td><code style="background: #f3f4f6; padding: 2px 4px; border-radius: 4px;">${tx.registration_number}</code></td>
-                  <td style="font-weight: 600;">${tx.user_name}</td>
+                  <td><code style="background: var(--bg); padding: 2px 6px; border-radius: 4px; font-size:12px;">${tx.registration_number}</code></td>
+                  <td class="td-name">${tx.user_name}</td>
                   <td>${tx.vendor_name}</td>
                   <td>
                     ${tx.mode === 'event' ?
-                  `<span style="background: var(--secondary); color: white; padding: 2px 6px; font-size: 10px; border-radius: 4px;">EVENT</span>` :
-                  `<span style="background: #e5e7eb; color: #4b5563; padding: 2px 6px; font-size: 10px; border-radius: 4px;">REGULAR</span>`
-                }
+                      `<span class="status-badge" style="background:#DBEAFE; color:#1E40AF;">EVENT</span>` :
+                      `<span class="status-badge inactive">REGULAR</span>`
+                    }
                   </td>
                 </tr>
               `;
@@ -2051,12 +1226,11 @@
 
         container.innerHTML = html;
       } catch (err) {
-        console.error('Consolidated report error:', err);
         container.innerHTML = `<div class="error-msg">Failed to load consolidated report: ${err.message}</div>`;
       }
     }
 
-    // Admin Dashboard
+    // Admin Dashboard Data
     async function renderAdminDashboard() {
       if (adminRefreshInterval) clearInterval(adminRefreshInterval);
 
@@ -2075,63 +1249,63 @@
         const { summary, transactions } = data;
 
         const mealIcons = [
-          `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>`,
-          `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
-          `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>`,
-          `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>`
+          `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>`,
+          `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+          `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>`,
+          `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>`
         ];
         let summaryHTML = '';
         summary.stats.forEach((stat, i) => {
           summaryHTML += `
-        <div class="stat-card">
-          <div class="stat-card-header">
-            <span class="stat-card-label">${stat.name}</span>
-            <div class="stat-card-icon">${mealIcons[i % mealIcons.length]}</div>
-          </div>
-          <div class="stat-card-value">${stat.count || 0}</div>
-        </div>
-      `;
+            <div class="stat-card">
+              <div class="stat-card-header">
+                <span>${stat.name}</span>
+                <div class="stat-card-icon">${mealIcons[i % mealIcons.length]}</div>
+              </div>
+              <div class="stat-card-value">${stat.count || 0}</div>
+            </div>
+          `;
         });
         summaryHTML += `
-      <div class="stat-card total">
-        <div class="stat-card-header">
-          <span class="stat-card-label">Total Served</span>
-          <div class="stat-card-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
-        </div>
-        <div class="stat-card-value">${summary.total}</div>
-      </div>
-    `;
+          <div class="stat-card total">
+            <div class="stat-card-header">
+              <span>Total Served Today</span>
+              <div class="stat-card-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+            </div>
+            <div class="stat-card-value">${summary.total}</div>
+          </div>
+        `;
         document.getElementById('todaySummary').innerHTML = summaryHTML;
 
         let txHTML = '';
         transactions.forEach(tx => {
-          const time = tx.transaction_time ? new Date(tx.transaction_time).toLocaleTimeString() : '';
+          const time = tx.transaction_time ? new Date(tx.transaction_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'}) : '';
           txHTML += `
-        <tr>
-          <td>${time}</td>
-          <td>${tx.user_name}</td>
-          <td>${tx.vendor_name}</td>
-          <td><span class="status-badge active">${tx.meal_name}</span></td>
-          <td><span style="display:inline-flex;align-items:center;gap:4px;color:#166534;font-weight:600;"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>OK</span></td>
-        </tr>
-      `;
+            <tr>
+              <td class="td-muted">${time}</td>
+              <td class="td-name">${tx.user_name}</td>
+              <td>${tx.vendor_name}</td>
+              <td><span class="status-badge active">${tx.meal_name}</span></td>
+              <td><span class="status status-delivered"><span class="status-dot"></span> Verified</span></td>
+            </tr>
+          `;
         });
 
         const liveFeedBody = document.getElementById('transactionTableBody');
         if (liveFeedBody) {
-          liveFeedBody.innerHTML = txHTML || '<tr><td colspan="5" style="text-align:center; padding:20px;">No transactions yet</td></tr>';
+          liveFeedBody.innerHTML = txHTML || '<tr><td colspan="5" style="text-align:center; padding:1.5rem; color:var(--muted);">No transactions yet</td></tr>';
         }
 
         const recentTxBody = document.getElementById('recentTransactionTableBody');
         if (recentTxBody) {
-          recentTxBody.innerHTML = txHTML || '<tr><td colspan="5" style="text-align:center; padding:20px;">No transactions yet</td></tr>';
+          recentTxBody.innerHTML = txHTML || '<tr><td colspan="5" style="text-align:center; padding:1.5rem; color:var(--muted);">No transactions yet</td></tr>';
         }
       } catch (err) {
         console.error('Admin dashboard refresh error:', err);
       }
     }
 
-    // ===== CSV/SPREADSHEET IMPORT =====
+    // CSV Import Handlers
     let pendingImportContent = '';
 
     function handleFileDrop(event) {
@@ -2157,10 +1331,10 @@
         document.getElementById('importPreviewContent').innerHTML = `
           <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
-            <strong style="font-size:14px;">${file.name}</strong>
-            <span style="font-size:11px; color:var(--text-muted);">(${lines.length} rows detected)</span>
+            <strong style="font-size:13px;">${file.name}</strong>
+            <span style="font-size:11px; color:var(--muted);">(${lines.length} rows detected)</span>
           </div>
-          <pre style="background:#1a1a1a; color:#e0e0e0; padding:12px; border-radius:4px; font-size:11px; overflow-x:auto; max-height:150px; white-space:pre-wrap;">${escapeHtml(preview)}${escapeHtml(more)}</pre>
+          <pre style="background:var(--dark-bg); color:#E5E7EB; padding:12px; border-radius:8px; font-size:11px; overflow-x:auto; max-height:140px; white-space:pre-wrap;">${escapeHtml(preview)}${escapeHtml(more)}</pre>
         `;
       };
       reader.readAsText(file);
@@ -2181,7 +1355,6 @@
       const btn = document.getElementById('confirmImportBtn');
       btn.disabled = true;
       btn.textContent = 'Importing...';
-      btn.style.opacity = '0.6';
 
       try {
         const res = await fetch('/api/admin/users/bulk-import', {
@@ -2197,28 +1370,26 @@
         const resultEl = document.getElementById('importResult');
         resultEl.classList.remove('hidden');
         if (data.success) {
-          resultEl.style.background = '#dcfce7';
-          resultEl.style.color = '#166534';
+          resultEl.style.background = '#D1FAE5';
+          resultEl.style.color = '#065F46';
           let msg = `<strong>Import complete!</strong> ${data.imported} users imported`;
           if (data.skipped > 0) msg += `, ${data.skipped} skipped`;
-          if (data.parseStats) msg += `<br><span style="font-size:11px;">Format detected: ${data.parseStats.headersFound ? 'Column headers found' : 'Positional/data-only'}</span>`;
           resultEl.innerHTML = msg;
           loadUsersTable();
         } else {
-          resultEl.style.background = '#fef2f2';
-          resultEl.style.color = '#991b1b';
+          resultEl.style.background = '#FEE2E2';
+          resultEl.style.color = '#991B1B';
           resultEl.innerHTML = `<strong>Import failed:</strong> ${data.error || 'Unknown error'}`;
         }
       } catch (err) {
         const resultEl = document.getElementById('importResult');
         resultEl.classList.remove('hidden');
-        resultEl.style.background = '#fef2f2';
-        resultEl.style.color = '#991b1b';
+        resultEl.style.background = '#FEE2E2';
+        resultEl.style.color = '#991B1B';
         resultEl.innerHTML = `<strong>Error:</strong> ${err.message}`;
       } finally {
         btn.disabled = false;
         btn.textContent = 'Import Users';
-        btn.style.opacity = '1';
         pendingImportContent = '';
         setTimeout(() => { document.getElementById('importPreview').classList.add('hidden'); }, 3000);
       }
@@ -2230,45 +1401,46 @@
 
         let html = '';
         users.forEach(user => {
-          const tokenExpiry = user.latest_token ? new Date(user.token_expiry).toLocaleTimeString() : '-';
-          const statusBadge = user.active ? '<span class="status-badge active">Active</span>' : '<span class="status-badge inactive">Inactive</span>';
+          const tokenExpiry = user.latest_token ? new Date(user.token_expiry).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '-';
+          const statusBadge = user.active ? '<span class="status status-delivered"><span class="status-dot"></span> Active</span>' : '<span class="status status-pending"><span class="status-dot"></span> Inactive</span>';
 
           html += `
-        <tr>
-          <td><input type="checkbox" class="user-checkbox" value="${user.id}" onchange="toggleUserSelection('${user.id}')"></td>
-          <td>${user.registration_number}</td>
-          <td>${user.name}</td>
-          <td>
-            <select onchange="updateAccommodation('${user.id}', this.value)" style="padding:4px 8px; border:1px solid #d1d5db; border-radius:4px; font-size:12px; font-weight:600; background:${user.accommodation === 'Y' ? '#dcfce7' : '#fef3c7'}; color:${user.accommodation === 'Y' ? '#166534' : '#92400e'};">
-              <option value="Y" ${user.accommodation === 'Y' ? 'selected' : ''}>Y (12 meals)</option>
-              <option value="N" ${user.accommodation === 'N' ? 'selected' : ''}>N (4 meals)</option>
-            </select>
-          </td>
-          <td>${statusBadge}</td>
-          <td><code style="background: #f3f4f6; padding: 4px 8px; border-radius: 4px; font-size: 12px;">${user.latest_token || '-'}</code></td>
-          <td>${tokenExpiry}</td>
-          <td>
-            <button onclick="viewUserDetails('${user.id}')" style="background: var(--dark-bg); color: white; padding: 4px 8px; border: none; cursor: pointer; font-size: 12px; margin-right: 4px;">View</button>
-            <button onclick="editUserMeals('${user.id}')" style="background: var(--primary); color: var(--dark-bg); padding: 4px 8px; border: none; cursor: pointer; font-size: 12px;">Edit</button>
-          </td>
-        </tr>
-      `;
+            <tr>
+              <td><input type="checkbox" class="user-checkbox" value="${user.id}" onchange="toggleUserSelection('${user.id}')"></td>
+              <td class="td-no">${user.registration_number}</td>
+              <td class="td-name">${user.name}</td>
+              <td>
+                <select onchange="updateAccommodation('${user.id}', this.value)" class="form-select" style="height:30px; padding:0 8px; font-size:12px; border-radius:6px;">
+                  <option value="Y" ${user.accommodation === 'Y' ? 'selected' : ''}>Y (12 meals)</option>
+                  <option value="N" ${user.accommodation === 'N' ? 'selected' : ''}>N (4 meals)</option>
+                </select>
+              </td>
+              <td>${statusBadge}</td>
+              <td><code style="background: var(--bg); padding: 3px 6px; border-radius: 4px; font-size: 12px;">${user.latest_token || '-'}</code></td>
+              <td class="td-muted">${tokenExpiry}</td>
+              <td>
+                <div style="display:flex; gap:4px;">
+                  <button class="btn btn-sm" onclick="viewUserDetails('${user.id}')">View</button>
+                  <button class="btn btn-sm btn-accent" onclick="editUserMeals('${user.id}')">Edit</button>
+                </div>
+              </td>
+            </tr>
+          `;
         });
 
-        document.getElementById('usersTableBody').innerHTML = html || '<tr><td colspan="8" style="text-align:center; padding:20px;">No users found</td></tr>';
+        document.getElementById('usersTableBody').innerHTML = html || '<tr><td colspan="8" style="text-align:center; padding:1.5rem; color:var(--muted);">No users found</td></tr>';
       } catch (err) {
         console.error('Error loading users:', err);
-        document.getElementById('usersTableBody').innerHTML = '<tr><td colspan="8" style="text-align:center; padding:20px;">Error loading users</td></tr>';
+        document.getElementById('usersTableBody').innerHTML = '<tr><td colspan="8" style="text-align:center; padding:1.5rem; color:var(--danger);">Error loading users</td></tr>';
       }
     }
 
+    let selectedUserIds = [];
+
     function toggleUserSelection(userId) {
       const idx = selectedUserIds.indexOf(userId);
-      if (idx > -1) {
-        selectedUserIds.splice(idx, 1);
-      } else {
-        selectedUserIds.push(userId);
-      }
+      if (idx > -1) selectedUserIds.splice(idx, 1);
+      else selectedUserIds.push(userId);
     }
 
     async function updateAccommodation(userId, value) {
@@ -2315,20 +1487,17 @@
         editingUserId = user.id;
         editingUserMeals = {};
 
-        // Show edit modal
         document.getElementById('editMealCard').classList.remove('hidden');
 
-        // Display user info
         const userInfo = document.getElementById('editUserInfo');
         userInfo.innerHTML = `
-      <div style="background: #fff; padding: 16px; border-left: 4px solid var(--primary); box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
-        <p style="font-size: 12px; text-transform:uppercase; color: #6b7280;">Editing meal allocation for:</p>
-        <p style="font-size: 20px; font-weight: 700; color: var(--text-main); font-family: 'Anton', sans-serif;">${user.name}</p>
-        <p style="font-size: 12px; color: #6b7280; margin-top: 4px;">Registration: ${user.registration_number} | Accommodation: ${user.accommodation === 'Y' ? 'Yes (12/type)' : 'No (4/type)'}</p>
-      </div>
-    `;
+          <div style="background: var(--bg); padding: 14px; border-left: 4px solid var(--accent); border-radius: var(--radius); margin-bottom:1rem;">
+            <p style="font-size: 11px; text-transform:uppercase; color: var(--muted); font-weight:600;">Editing meal allocation for:</p>
+            <p style="font-size: 18px; font-weight: 700; color: var(--text); font-family: 'Anton', sans-serif;">${user.name}</p>
+            <p style="font-size: 12px; color: var(--muted); margin-top: 2px;">REG: ${user.registration_number} | Accommodation: ${user.accommodation === 'Y' ? 'Yes (12/type)' : 'No (4/type)'}</p>
+          </div>
+        `;
 
-        // Create edit form
         const form = document.getElementById('editMealForm');
         form.innerHTML = '';
 
@@ -2339,24 +1508,22 @@
           };
 
           form.innerHTML += `
-        <div style="background: #fff; padding: 16px; border: 1px solid #e5e7eb;">
-          <label style="display: block; font-weight: 700; margin-bottom: 12px; color: var(--text-main); font-family:'Anton', sans-serif; text-transform:uppercase;">${meal.name}</label>
-          
-          <div style="margin-bottom: 12px;">
-            <label style="font-size: 10px; text-transform:uppercase; color: #6b7280; display: block; margin-bottom: 4px;">Allocated:</label>
-            <input type="number" id="allocated_${meal.name}" value="${meal.allocated}" min="0" max="999"
-                   style="width: 100%; padding: 8px; border: 1px solid #d1d5db; background:#fafafa; font-size: 14px;"
-                   onchange="editingUserMeals['${meal.name}'].allocated = parseInt(this.value)">
-          </div>
+            <div style="background: var(--bg); padding: 14px; border: 1px solid var(--border); border-radius: 8px;">
+              <label style="display: block; font-weight: 600; margin-bottom: 8px; color: var(--text); font-family:'Anton', sans-serif; font-size:16px;">${meal.name}</label>
+              
+              <div class="form-field" style="margin-bottom:8px;">
+                <label class="form-label">Allocated</label>
+                <input type="number" class="form-input" id="allocated_${meal.name}" value="${meal.allocated}" min="0" max="999"
+                       onchange="editingUserMeals['${meal.name}'].allocated = parseInt(this.value)">
+              </div>
 
-          <div>
-            <label style="font-size: 10px; text-transform:uppercase; color: #6b7280; display: block; margin-bottom: 4px;">Remaining:</label>
-            <input type="number" id="remaining_${meal.name}" value="${meal.remaining}" min="0" max="999"
-                   style="width: 100%; padding: 8px; border: 1px solid #d1d5db; background:#fafafa; font-size: 14px;"
-                   onchange="editingUserMeals['${meal.name}'].remaining = parseInt(this.value)">
-          </div>
-        </div>
-      `;
+              <div class="form-field" style="margin:0;">
+                <label class="form-label">Remaining</label>
+                <input type="number" class="form-input" id="remaining_${meal.name}" value="${meal.remaining}" min="0" max="999"
+                       onchange="editingUserMeals['${meal.name}'].remaining = parseInt(this.value)">
+              </div>
+            </div>
+          `;
         });
       } catch (err) {
         showError('Failed to load user for editing');
@@ -2374,11 +1541,7 @@
         await apiCall(`/admin/users/${editingUserId}/meals`, 'POST', { meals });
 
         alert('Meal allocations updated successfully!');
-
-        // Hide edit modal
         document.getElementById('editMealCard').classList.add('hidden');
-
-        // Reload users table
         await loadUsersTable();
 
         editingUserId = null;
@@ -2399,9 +1562,7 @@
       const rows = document.querySelectorAll('#usersTableBody tr');
       
       rows.forEach(row => {
-        // Skip filtering the "Loading users..." row
         if (row.querySelector('.loading')) return;
-        
         const regCell = row.cells[1].textContent.toLowerCase();
         const nameCell = row.cells[2].textContent.toLowerCase();
         
@@ -2419,36 +1580,38 @@
         const events = await apiCall('/admin/events');
         const container = document.getElementById('eventsList');
         if (!events || events.length === 0) {
-          container.innerHTML = '<p style="color:var(--text-muted); padding:16px;">No events yet. Create one above.</p>';
+          container.innerHTML = '<p style="color:var(--muted); padding:1.5rem; text-align:center;">No events created yet. Use the form above to add an event.</p>';
           return;
         }
         container.innerHTML = `
-      <table style="width:100%;">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Dates</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${events.map(e => `
-            <tr>
-              <td>${e.name}</td>
-              <td>${e.start_date} – ${e.end_date}</td>
-              <td>
-                <button onclick="openEventDetail('${e.id}')" style="background:var(--dark-bg); color:white; padding:6px 12px; border:none; cursor:pointer; margin-right:8px; font-size:12px;">View</button>
-                <a href="${window.location.origin}/api/admin/events/${e.id}/export-pdf" target="_blank" 
-                   onclick="return exportEventPDF('${e.id}', event)"
-                   style="background:var(--success); color:white; padding:6px 12px; border:none; cursor:pointer; text-decoration:none; font-size:12px; display:inline-block;">Export PDF</a>
-              </td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    `;
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Event Name</th>
+                <th>Dates</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${events.map(e => `
+                <tr>
+                  <td class="td-name">${e.name}</td>
+                  <td class="td-muted">${e.start_date} – ${e.end_date}</td>
+                  <td>
+                    <div style="display:flex; gap:6px;">
+                      <button class="btn btn-sm btn-primary" onclick="openEventDetail('${e.id}')">View Details</button>
+                      <a href="${window.location.origin}/api/admin/events/${e.id}/export-pdf" target="_blank" 
+                         onclick="return exportEventPDF('${e.id}', event)"
+                         class="btn btn-sm btn-success">Export PDF</a>
+                    </div>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
       } catch (err) {
-        document.getElementById('eventsList').innerHTML = '<p style="color:var(--error);">Failed to load events.</p>';
+        document.getElementById('eventsList').innerHTML = '<p style="color:var(--danger); padding:1.5rem;">Failed to load events.</p>';
       }
     }
 
@@ -2466,7 +1629,7 @@
         document.getElementById('eventStartDate').value = '';
         document.getElementById('eventEndDate').value = '';
         loadEvents();
-        alert('Event created!');
+        alert('Event created successfully!');
       } catch (err) {
         alert('Failed to create event: ' + err.message);
       }
@@ -2483,56 +1646,63 @@
         const registeredIds = event.registrations.map(r => r.user_id);
 
         document.getElementById('eventDetailContent').innerHTML = `
-      <div style="margin-bottom:24px;">
-        <p style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">${event.start_date} – ${event.end_date}</p>
-        <div style="display:flex; gap:12px; margin-bottom:16px; flex-wrap:wrap;">
-          <button onclick="generateEventQR('${eventId}')" style="background:var(--primary); color:var(--dark-bg); padding:10px 20px; border:none; font-weight:700; cursor:pointer;">Generate QR Tokens</button>
-          <button onclick="addAllUsersToEvent('${eventId}')" style="background:var(--secondary); color:white; padding:10px 20px; border:none; font-weight:700; cursor:pointer;">Add All Users</button>
-          <a href="${window.location.origin}/api/admin/events/${eventId}/export-pdf" target="_blank" 
-             onclick="return exportEventPDF('${eventId}', event)"
-             style="background:var(--success); color:white; padding:10px 20px; border:none; cursor:pointer; text-decoration:none; font-weight:700; display:inline-block;">Export PDF</a>
-          <button onclick="downloadSelectedQR('${eventId}')" id="batchQrBtn" style="background:#1a1a1a; color:white; padding:10px 20px; border:none; font-weight:700; cursor:pointer;${event.registrations.some(r => r.qr_token) ? '' : ' display:none;'}">Download Selected QR (ZIP)</button>
-        </div>
-      </div>
-      <div style="margin-bottom:16px;">
-        <label style="font-size:12px; font-weight:700; color:var(--text-muted);">Add users to event</label>
-        <select id="addUserSelect" style="padding:10px; margin-top:8px; min-width:200px;">
-          <option value="">-- Select user --</option>
-          ${users.filter(u => !registeredIds.includes(u.id)).map(u =>
-          `<option value="${u.id}">${u.name} (${u.registration_number})</option>`
-        ).join('')}
-        </select>
-        <button onclick="addUserToEvent('${eventId}')" style="background:var(--dark-bg); color:white; padding:10px 20px; border:none; cursor:pointer; margin-left:8px;">Add</button>
-      </div>
-      <table style="width:100%; margin-top:16px;">
-        <thead>
-          <tr>
-            <th style="width:36px;"><input type="checkbox" id="selectAllEventQR" onchange="toggleAllEventQR(this)" title="Select all"></th>
-            <th>Name</th>
-            <th>Reg #</th>
-            <th>Meals Remaining</th>
-            <th>QR</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${event.registrations.length === 0 ? '<tr><td colspan="6" style="text-align:center; padding:20px;">No registrations yet.</td></tr>' : ''}
-          ${event.registrations.map(r => `
-            <tr>
-              <td>${r.qr_token ? `<input type="checkbox" class="event-qr-cb" value="${r.user_id}" onchange="updateBatchQrBtn('${eventId}')">` : ''}</td>
-              <td>${r.name}</td>
-              <td>${r.registration_number}</td>
-              <td>${10 - (r.consumed_count || 0)}/10</td>
-              <td>${r.qr_token ? '✓' : '—'}</td>
-              <td style="display:flex; gap:4px; flex-wrap:wrap;">
-                ${r.qr_token ? `<button onclick="downloadSingleQR('${eventId}', '${r.user_id}')" style="background:var(--primary); color:var(--dark-bg); padding:4px 8px; border:none; cursor:pointer; font-size:11px; font-weight:700;">Download QR</button>` : ''}
-                <button onclick="removeUserFromEvent('${eventId}', '${r.user_id}')" style="background:var(--error); color:white; padding:4px 8px; border:none; cursor:pointer; font-size:11px;">Remove</button>
-              </td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-    `;
+          <div style="margin-bottom:1.5rem;">
+            <p style="font-size:13px; color:var(--muted); margin-bottom:1rem;">Event Date: <strong>${event.start_date} – ${event.end_date}</strong></p>
+            <div style="display:flex; gap:8px; margin-bottom:1.25rem; flex-wrap:wrap;">
+              <button class="btn btn-accent" onclick="generateEventQR('${eventId}')">Generate QR Tokens</button>
+              <button class="btn btn-primary" onclick="addAllUsersToEvent('${eventId}')">Add All Users</button>
+              <a href="${window.location.origin}/api/admin/events/${eventId}/export-pdf" target="_blank" 
+                 onclick="return exportEventPDF('${eventId}', event)" class="btn btn-success">Export Printable PDF</a>
+              <button class="btn" onclick="downloadSelectedQR('${eventId}')" id="batchQrBtn" style="${event.registrations.some(r => r.qr_token) ? '' : 'display:none;'}">Download Selected QR (ZIP)</button>
+            </div>
+          </div>
+          
+          <div style="margin-bottom:1.5rem; padding:1rem; background:var(--bg); border-radius:var(--radius); border:1px solid var(--border);">
+            <label class="form-label" style="margin-bottom:6px; display:block;">Add User to Event</label>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <select class="form-select" id="addUserSelect" style="flex:1; min-width:200px;">
+                <option value="">-- Select user --</option>
+                ${users.filter(u => !registeredIds.includes(u.id)).map(u =>
+                  `<option value="${u.id}">${u.name} (${u.registration_number})</option>`
+                ).join('')}
+              </select>
+              <button class="btn btn-primary" onclick="addUserToEvent('${eventId}')">Add User</button>
+            </div>
+          </div>
+
+          <div style="overflow-x:auto;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="width:36px;"><input type="checkbox" id="selectAllEventQR" onchange="toggleAllEventQR(this)"></th>
+                  <th>Name</th>
+                  <th>REG #</th>
+                  <th>Meals Remaining</th>
+                  <th>QR Token</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${event.registrations.length === 0 ? '<tr><td colspan="6" style="text-align:center; padding:1.5rem; color:var(--muted);">No registrations yet.</td></tr>' : ''}
+                ${event.registrations.map(r => `
+                  <tr>
+                    <td>${r.qr_token ? `<input type="checkbox" class="event-qr-cb" value="${r.user_id}" onchange="updateBatchQrBtn('${eventId}')">` : ''}</td>
+                    <td class="td-name">${r.name}</td>
+                    <td class="td-no">${r.registration_number}</td>
+                    <td>${r.remaining_total !== undefined ? `${r.remaining_total}/${r.allocated_total}` : `${10 - (r.consumed_count || 0)}/10`}</td>
+                    <td>${r.qr_token ? '<span class="status status-delivered"><span class="status-dot"></span> Generated</span>' : '<span class="td-muted">—</span>'}</td>
+                    <td>
+                      <div style="display:flex; gap:4px;">
+                        ${r.qr_token ? `<button class="btn btn-sm btn-accent" onclick="downloadSingleQR('${eventId}', '${r.user_id}')">Download QR</button>` : ''}
+                        <button class="btn btn-sm btn-danger" onclick="removeUserFromEvent('${eventId}', '${r.user_id}')">Remove</button>
+                      </div>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
       } catch (err) {
         alert('Failed to load event: ' + err.message);
       }
@@ -2546,16 +1716,11 @@
     async function addUserToEvent(eventId) {
       const select = document.getElementById('addUserSelect');
       const userId = select && select.value;
-      if (!userId) {
-        alert('Select a user first.');
-        return;
-      }
+      if (!userId) { alert('Select a user first.'); return; }
       try {
         await apiCall(`/admin/events/${eventId}/registrations`, 'POST', { userIds: [userId] });
         openEventDetail(eventId);
-      } catch (err) {
-        alert('Failed to add user: ' + err.message);
-      }
+      } catch (err) { alert('Failed to add user: ' + err.message); }
     }
 
     async function removeUserFromEvent(eventId, userId) {
@@ -2563,9 +1728,7 @@
       try {
         await apiCall(`/admin/events/${eventId}/registrations`, 'DELETE', { userId });
         openEventDetail(eventId);
-      } catch (err) {
-        alert('Failed to remove: ' + err.message);
-      }
+      } catch (err) { alert('Failed to remove: ' + err.message); }
     }
 
     async function addAllUsersToEvent(eventId) {
@@ -2574,9 +1737,7 @@
         const r = await apiCall(`/admin/events/${eventId}/registrations/all`, 'POST');
         alert(`Added ${r.added} users to the event.`);
         openEventDetail(eventId);
-      } catch (err) {
-        alert('Failed to add users: ' + err.message);
-      }
+      } catch (err) { alert('Failed to add users: ' + err.message); }
     }
 
     async function generateEventQR(eventId) {
@@ -2584,9 +1745,7 @@
         const r = await apiCall(`/admin/events/${eventId}/generate-qr`, 'POST');
         alert(`Generated ${r.generated} QR tokens for ${r.total} registered users.`);
         openEventDetail(eventId);
-      } catch (err) {
-        alert('Failed to generate QR: ' + err.message);
-      }
+      } catch (err) { alert('Failed to generate QR: ' + err.message); }
     }
 
     function exportEventPDF(eventId, ev) {
@@ -2609,20 +1768,41 @@
       return false;
     }
 
-    function downloadSingleQR(eventId, userId) {
-      window.open(`${API_BASE}/admin/events/${eventId}/qr-image/${userId}`, '_blank');
+    async function downloadSingleQR(eventId, userId) {
+      try {
+        const response = await fetch(`${API_BASE}/admin/events/${eventId}/qr-image/${userId}`, {
+          headers: { 'Authorization': `Bearer ${sessionToken}` }
+        });
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({}));
+          alert('Error: ' + (err.error || 'Failed to download QR'));
+          return;
+        }
+        const blob = await response.blob();
+        const disposition = response.headers.get('Content-Disposition');
+        let filename = `QR_${userId}.png`;
+        if (disposition) {
+          const match = disposition.match(/filename="?([^"]+)"?/);
+          if (match) filename = match[1];
+        }
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(a.href);
+      } catch (err) {
+        alert('Download failed: ' + err.message);
+      }
     }
 
     function toggleAllEventQR(selectAllCb) {
-      document.querySelectorAll('.event-qr-cb').forEach(cb => {
-        cb.checked = selectAllCb.checked;
-      });
-      const eventId = selectAllCb.closest('[data-event-id]')?.getAttribute('data-event-id')
-        || document.querySelector('[onclick*="viewEvent("]')?.getAttribute('onclick')?.match(/viewEvent\('([^']+)'\)/)?.[1];
-      if (eventId) updateBatchQrBtn(eventId);
+      document.querySelectorAll('.event-qr-cb').forEach(cb => { cb.checked = selectAllCb.checked; });
+      updateBatchQrBtn();
     }
 
-    function updateBatchQrBtn(eventId) {
+    function updateBatchQrBtn() {
       const checked = document.querySelectorAll('.event-qr-cb:checked').length;
       const btn = document.getElementById('batchQrBtn');
       if (btn) {
@@ -2686,23 +1866,18 @@
 
       const container = document.getElementById('mealsPerDayResults');
 
-      if (!startDate || !endDate) {
-        container.innerHTML = '<p style="color:var(--error);">Please select both start and end dates.</p>';
-        return;
-      }
-
       try {
-        container.innerHTML = '<p style="color:var(--text-muted);">Loading...</p>';
+        container.innerHTML = '<p style="color:var(--muted);">Loading...</p>';
         const data = await apiCall(`/admin/stats/meals-per-day?startDate=${startDate}&endDate=${endDate}`);
 
         if (!data.mealsPerDay || data.mealsPerDay.length === 0) {
-          container.innerHTML = '<p style="color:var(--text-muted);">No meals served in this period.</p>';
+          container.innerHTML = '<p style="color:var(--muted);">No meals served in this period.</p>';
           return;
         }
 
-        let html = `<div style="margin-bottom:12px; padding:8px; background:var(--bg-color);">
-      <strong>Total:</strong> ${data.summary.totalMeals} meals over ${data.summary.totalDays} days
-    </div>`;
+        let html = `<div style="margin-bottom:12px; padding:10px; background:var(--surface); border:1px solid var(--border); border-radius:6px; font-size:12px;">
+          <strong>Total:</strong> ${data.summary.totalMeals} meals over ${data.summary.totalDays} days
+        </div>`;
 
         const byDate = {};
         data.mealsPerDay.forEach(m => {
@@ -2711,18 +1886,18 @@
         });
 
         Object.keys(byDate).sort().reverse().forEach(date => {
-          html += `<div style="margin-bottom:16px; border-bottom:1px solid #eee; padding-bottom:8px;">
-        <strong style="color:var(--dark-bg);">${date}</strong>
-        <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:8px;">`;
+          html += `<div style="margin-bottom:12px; border-bottom:1px solid var(--border); padding-bottom:8px;">
+            <strong style="color:var(--text); font-size:13px;">${date}</strong>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:6px;">`;
           byDate[date].forEach(m => {
-            html += `<span style="background:var(--primary); color:var(--dark-bg); padding:4px 12px; font-size:12px; font-weight:600;">${m.meal_type}: ${m.count}</span>`;
+            html += `<span class="status-badge active">${m.meal_type}: ${m.count}</span>`;
           });
           html += `</div></div>`;
         });
 
         container.innerHTML = html;
       } catch (err) {
-        container.innerHTML = `<p style="color:var(--error);">Error: ${err.message}</p>`;
+        container.innerHTML = `<p style="color:var(--danger);">Error: ${err.message}</p>`;
       }
     }
 
@@ -2736,54 +1911,52 @@
       }
 
       try {
-        container.innerHTML = '<p style="color:var(--text-muted);">Loading...</p>';
+        container.innerHTML = '<p style="color:var(--muted);">Loading...</p>';
         const data = await apiCall(`/admin/stats/meals-per-time?date=${date}`);
 
         if (!data.hourlyTotals || data.hourlyTotals.length === 0) {
-          container.innerHTML = '<p style="color:var(--text-muted);">No meals served on this date.</p>';
+          container.innerHTML = '<p style="color:var(--muted);">No meals served on this date.</p>';
           return;
         }
 
         let html = '';
         if (data.peakHour) {
-          html += `<div style="margin-bottom:12px; padding:8px; background:#dcfce7; color:#166534;">
-        <strong>Peak Hour:</strong> ${data.peakHour.hour}:00 (${data.peakHour.count} meals)
-      </div>`;
+          html += `<div style="margin-bottom:12px; padding:8px 12px; background:#D1FAE5; color:#065F46; border-radius:6px; font-size:12px;">
+            <strong>Peak Hour:</strong> ${data.peakHour.hour}:00 (${data.peakHour.count} meals)
+          </div>`;
         }
 
-        html += '<div style="display:flex; gap:4px; align-items:flex-end; height:120px; margin-bottom:12px; border-bottom:1px solid #eee; padding-bottom:8px;">';
+        html += '<div style="display:flex; gap:4px; align-items:flex-end; height:120px; margin-bottom:12px; border-bottom:1px solid var(--border); padding-bottom:8px;">';
         const maxCount = Math.max(...data.hourlyTotals.map(h => h.count));
         data.hourlyTotals.forEach(h => {
           const height = maxCount > 0 ? (h.count / maxCount) * 100 : 0;
           html += `<div style="flex:1; text-align:center;">
-        <div style="background:var(--primary); height:${height}px; margin:auto; width:80%;"></div>
-        <div style="font-size:10px; margin-top:4px;">${h.hour}:00</div>
-        <div style="font-size:9px; color:var(--text-muted);">${h.count}</div>
-      </div>`;
+            <div style="background:var(--accent); height:${height}px; margin:auto; width:70%; border-radius:4px 4px 0 0;"></div>
+            <div style="font-size:10px; margin-top:4px;">${h.hour}:00</div>
+            <div style="font-size:9px; color:var(--muted);">${h.count}</div>
+          </div>`;
         });
         html += '</div>';
 
-        html += '<div><strong style="font-size:12px;">By Meal Type:</strong></div>';
+        html += '<div style="font-size:12px; font-weight:600; margin-bottom:4px;">By Meal Type:</div>';
         const byMeal = {};
         data.mealsPerTime.forEach(m => {
           if (!byMeal[m.meal_type]) byMeal[m.meal_type] = [];
           byMeal[m.meal_type].push(m);
         });
         Object.keys(byMeal).forEach(meal => {
-          html += `<div style="margin-top:8px;"><strong>${meal}:</strong> `;
+          html += `<div style="font-size:12px; margin-top:4px;"><strong>${meal}:</strong> `;
           html += byMeal[meal].map(m => `${m.hour}:00 = ${m.count}`).join(', ');
           html += '</div>';
         });
 
         container.innerHTML = html;
       } catch (err) {
-        container.innerHTML = `<p style="color:var(--error);">Error: ${err.message}</p>`;
+        container.innerHTML = `<p style="color:var(--danger);">Error: ${err.message}</p>`;
       }
     }
 
     // Bulk Allocation Functions
-    let selectedUserIds = [];
-
     async function loadMealTypesForAllocation() {
       try {
         const data = await apiCall('/admin/dashboard');
@@ -2804,17 +1977,17 @@
       const resultDiv = document.getElementById('allocResult');
 
       if (!mealTypeName) {
-        resultDiv.innerHTML = '<p style="color:var(--error);">Please select a meal type.</p>';
+        resultDiv.innerHTML = '<p style="color:var(--danger);">Please select a meal type.</p>';
         return;
       }
 
       if (!selectedUserIds || selectedUserIds.length === 0) {
-        resultDiv.innerHTML = '<p style="color:var(--error);">Please select users from the table (checkboxes).</p>';
+        resultDiv.innerHTML = '<p style="color:var(--danger);">Please select users from the table (checkboxes).</p>';
         return;
       }
 
       try {
-        resultDiv.innerHTML = '<p style="color:var(--text-muted);">Allocating...</p>';
+        resultDiv.innerHTML = '<p style="color:var(--muted);">Allocating...</p>';
         const data = await apiCall('/admin/allocate-meals', 'POST', {
           userIds: selectedUserIds,
           mealTypeId: mealTypeName,
@@ -2822,11 +1995,11 @@
           operation: operation
         });
 
-        resultDiv.innerHTML = `<p style="color:var(--success);">✅ ${data.message}</p>`;
+        resultDiv.innerHTML = `<p style="color:var(--success); font-weight:600;">✅ ${data.message}</p>`;
         selectedUserIds = [];
         document.querySelectorAll('.user-checkbox').forEach(cb => cb.checked = false);
       } catch (err) {
-        resultDiv.innerHTML = `<p style="color:var(--error);">Error: ${err.message}</p>`;
+        resultDiv.innerHTML = `<p style="color:var(--danger);">Error: ${err.message}</p>`;
       }
     }
 
@@ -2837,7 +2010,7 @@
       const resultDiv = document.getElementById('allocResult');
 
       if (!mealTypeName) {
-        resultDiv.innerHTML = '<p style="color:var(--error);">Please select a meal type.</p>';
+        resultDiv.innerHTML = '<p style="color:var(--danger);">Please select a meal type.</p>';
         return;
       }
 
@@ -2846,16 +2019,16 @@
       }
 
       try {
-        resultDiv.innerHTML = '<p style="color:var(--text-muted);">Allocating...</p>';
+        resultDiv.innerHTML = '<p style="color:var(--muted);">Allocating...</p>';
         const data = await apiCall('/admin/allocate-meals/all', 'POST', {
           mealTypeId: mealTypeName,
           amount: amount,
           operation: operation
         });
 
-        resultDiv.innerHTML = `<p style="color:var(--success);">✅ ${data.message}</p>`;
+        resultDiv.innerHTML = `<p style="color:var(--success); font-weight:600;">✅ ${data.message}</p>`;
       } catch (err) {
-        resultDiv.innerHTML = `<p style="color:var(--error);">Error: ${err.message}</p>`;
+        resultDiv.innerHTML = `<p style="color:var(--danger);">Error: ${err.message}</p>`;
       }
     }
 
@@ -2870,7 +2043,6 @@
           return;
         }
 
-        // Create print window content
         const printWindow = window.open('', '_blank');
         const currentDate = new Date().toLocaleString();
 
@@ -2879,139 +2051,22 @@
           <html>
           <head>
             <title>Live Feed Report - ${currentDate}</title>
+            <link rel="preconnect" href="https://fonts.googleapis.com">
+            <link href="https://fonts.googleapis.com/css2?family=Anton&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
             <style>
-              @media print {
-                @page { margin: 1cm; }
-                body { margin: 0; }
-              }
-              body {
-                font-family: 'Manrope', Arial, sans-serif;
-                padding: 20px;
-                background: white;
-                color: #1a1a1a;
-              }
-              .report-header {
-                text-align: center;
-                margin-bottom: 30px;
-                border-bottom: 3px solid #1a1a1a;
-                padding-bottom: 20px;
-              }
-              .report-header h1 {
-                font-family: 'Anton', sans-serif;
-                font-size: 32px;
-                margin: 0 0 10px 0;
-                text-transform: uppercase;
-                letter-spacing: 2px;
-              }
-              .report-header .subtitle {
-                font-size: 14px;
-                color: #666;
-                text-transform: uppercase;
-                letter-spacing: 1px;
-              }
-              .report-meta {
-                margin-bottom: 20px;
-                padding: 15px;
-                background: #f5f5f5;
-                border-left: 4px solid #E8b923;
-              }
-              .report-meta p {
-                margin: 5px 0;
-                font-size: 13px;
-              }
-              table {
-                width: 100%;
-                border-collapse: collapse;
-                margin-top: 20px;
-              }
-              thead {
-                background: #1a1a1a;
-                color: white;
-              }
-              th {
-                padding: 12px;
-                text-align: left;
-                font-size: 11px;
-                text-transform: uppercase;
-                letter-spacing: 1px;
-                font-weight: 600;
-              }
-              td {
-                padding: 10px 12px;
-                border-bottom: 1px solid #e5e7eb;
-                font-size: 13px;
-              }
-              tr:nth-child(even) {
-                background: #fafafa;
-              }
-              .meal-badge {
-                background: #E8b923;
-                color: #1a1a1a;
-                padding: 4px 8px;
-                border-radius: 3px;
-                font-weight: 600;
-                font-size: 11px;
-                display: inline-block;
-              }
-              .status-icon {
-                color: #10b981;
-                font-size: 16px;
-              }
-              .report-footer {
-                margin-top: 40px;
-                padding-top: 20px;
-                border-top: 2px solid #e5e7eb;
-                text-align: center;
-                font-size: 11px;
-                color: #666;
-              }
-              .summary-box {
-                background: #dcfce7;
-                border: 2px solid #10b981;
-                padding: 15px;
-                margin-bottom: 20px;
-                border-radius: 4px;
-              }
-              .summary-box h3 {
-                margin: 0 0 10px 0;
-                color: #166534;
-                font-size: 16px;
-              }
-              .summary-box p {
-                margin: 5px 0;
-                font-size: 14px;
-                color: #166534;
-              }
+              body { font-family: 'Manrope', sans-serif; padding: 30px; color: #111827; }
+              h1 { font-family: 'Anton', sans-serif; margin: 0; font-size: 26px; letter-spacing: 1px; text-transform: uppercase; }
+              table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+              th { text-align: left; background: #F3F4F6; padding: 10px; font-size: 11px; text-transform: uppercase; }
+              td { padding: 10px; border-bottom: 1px solid #E5E7EB; font-size: 13px; }
             </style>
           </head>
           <body>
-            <div class="report-header">
-              <h1>MEAL TICKETS SYSTEM</h1>
-              <div class="subtitle">Live Feed Transaction Report</div>
-            </div>
-            
-            <div class="report-meta">
-              <p><strong>Report Generated:</strong> ${currentDate}</p>
-              <p><strong>Total Transactions:</strong> ${transactions.length}</p>
-              <p><strong>Report Type:</strong> Live Feed - All Recent Transactions</p>
-            </div>
-            
-            <div class="summary-box">
-              <h3>📊 Summary</h3>
-              <p>This report contains all recent transactions from the live feed.</p>
-              <p>Total meals served: <strong>${transactions.length}</strong></p>
-            </div>
-            
+            <h1>MEAL TICKETS SYSTEM</h1>
+            <p style="color:#6B7280; font-size:13px;">Live Feed Transaction Report · ${currentDate}</p>
             <table>
               <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Time</th>
-                  <th>User</th>
-                  <th>Vendor</th>
-                  <th>Meal Type</th>
-                  <th>Status</th>
-                </tr>
+                <tr><th>#</th><th>Time</th><th>User</th><th>Vendor</th><th>Meal</th><th>Status</th></tr>
               </thead>
               <tbody>
         `;
@@ -3024,8 +2079,8 @@
               <td>${time}</td>
               <td>${tx.user_name || 'N/A'}</td>
               <td>${tx.vendor_name || 'N/A'}</td>
-              <td><span class="meal-badge">${tx.meal_name || 'N/A'}</span></td>
-              <td><span class="status-icon">✅</span></td>
+              <td>${tx.meal_name || 'N/A'}</td>
+              <td>Verified</td>
             </tr>
           `;
         });
@@ -3033,63 +2088,51 @@
         reportHTML += `
               </tbody>
             </table>
-            
-            <div class="report-footer">
-              <p>Meal Tickets System - Live Feed Report</p>
-              <p>Generated on ${currentDate}</p>
-              <p>This is an automated report. All transactions are recorded and verified.</p>
-            </div>
           </body>
           </html>
         `;
 
         printWindow.document.write(reportHTML);
         printWindow.document.close();
-
-        // Wait for content to load, then print
         printWindow.focus();
-        setTimeout(() => {
-          printWindow.print();
-          printWindow.close();
-        }, 500);
+        setTimeout(() => { printWindow.print(); printWindow.close(); }, 500);
       } catch (err) {
         alert('Failed to generate report: ' + err.message);
       }
     }
 
-    // --- System Maintenance Handlers ---
-
+    // Maintenance Handlers
     async function fixSystemDatabase() {
       const resDiv = document.getElementById('maintenanceResult');
-      if (!confirm('This will modify the internal database structure to allow users to eat multiple different meals per event day. Continue?')) return;
+      if (!confirm('Modify internal database structure to allow users multiple different meals per event day?')) return;
 
       try {
-        resDiv.innerHTML = '<span style="color:var(--text-muted)">Repairing database structure...</span>';
+        resDiv.innerHTML = '<span style="color:var(--muted)">Repairing database structure...</span>';
         const r = await apiCall('/admin/fix-database', 'POST');
-        resDiv.innerHTML = `<span style="color:var(--success)">✅ ${r.message}</span>`;
-        alert('Repair Successful: You can now scan multiple meals for the same user.');
+        resDiv.innerHTML = `<span style="color:var(--success); font-weight:600;">✅ ${r.message}</span>`;
+        alert('Repair Successful!');
       } catch (err) {
-        resDiv.innerHTML = `<span style="color:var(--error)">❌ Repair Failed: ${err.message}</span>`;
+        resDiv.innerHTML = `<span style="color:var(--danger)">❌ Repair Failed: ${err.message}</span>`;
         alert('Error: ' + err.message);
       }
     }
 
     async function syncAllUserMeals() {
       const resDiv = document.getElementById('maintenanceResult');
-      if (!confirm('This will RESET ALL active users to their default meal balance (Y=12, N=4). Existing redemptions will NOT be deleted, but remaining counts will be reset. Continue?')) return;
+      if (!confirm('RESET ALL active users to their default meal balance (Y=12, N=4)?')) return;
 
       try {
-        resDiv.innerHTML = '<span style="color:var(--text-muted)">Synchronizing meal balances...</span>';
-        const r = await apiCall('/admin/allocate-meals', 'POST', {
+        resDiv.innerHTML = '<span style="color:var(--muted)">Synchronizing meal balances...</span>';
+        await apiCall('/admin/allocate-meals', 'POST', {
           userIds: 'all',
           amount: 0,
           operation: 'reset',
           mealTypeId: 'all'
         });
-        resDiv.innerHTML = `<span style="color:var(--success)">✅ All active users reset to default balance (Y=12, N=4).</span>`;
+        resDiv.innerHTML = `<span style="color:var(--success); font-weight:600;">✅ All active users reset to default balance (Y=12, N=4).</span>`;
         alert('Sync Successful!');
       } catch (err) {
-        resDiv.innerHTML = `<span style="color:var(--error)">❌ Sync Failed: ${err.message}</span>`;
+        resDiv.innerHTML = `<span style="color:var(--danger)">❌ Sync Failed: ${err.message}</span>`;
       }
     }
 
@@ -3123,15 +2166,13 @@
         const today = new Date();
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(today.getDate() - 30);
-
         end = today.toISOString().split('T')[0];
         start = thirtyDaysAgo.toISOString().split('T')[0];
-
         document.getElementById('matrixStartDate').value = start;
         document.getElementById('matrixEndDate').value = end;
       }
 
-      container.innerHTML = '<div class="loading">Generating matrix...</div>';
+      container.innerHTML = '<div class="loading" style="text-align:center; color:var(--muted); padding:1.5rem;">Generating matrix...</div>';
 
       try {
         let url = API_BASE + '/admin/stats/daily-matrix';
@@ -3141,17 +2182,17 @@
         const { mealTypes, rows, summary } = data;
 
         if (rows.length === 0) {
-          container.innerHTML = '<div class="empty-msg">No transactions found for this period.</div>';
+          container.innerHTML = '<div style="text-align:center; padding:1.5rem; color:var(--muted);">No transactions found for this period.</div>';
           return;
         }
 
         let html = `
-          <table style="width: 100%; border-collapse: collapse;">
+          <table class="data-table">
             <thead>
               <tr>
-                <th style="text-align: left; background: #f3f4f6; color: var(--dark-bg); padding: 12px; border: 1px solid #ddd;">Date</th>
-                ${mealTypes.map(mt => `<th style="text-align: center; background: #f3f4f6; color: var(--dark-bg); padding: 12px; border: 1px solid #ddd;">${mt.name}</th>`).join('')}
-                <th style="text-align: center; background: var(--dark-bg); color: var(--primary); padding: 12px; border: 1px solid #ddd;">Daily Total</th>
+                <th>Date</th>
+                ${mealTypes.map(mt => `<th style="text-align: center;">${mt.name}</th>`).join('')}
+                <th style="text-align: center; background: var(--text); color: white;">Daily Total</th>
               </tr>
             </thead>
             <tbody>
@@ -3160,13 +2201,13 @@
         rows.forEach(row => {
           html += `
             <tr>
-              <td style="font-weight: 700; border: 1px solid #eee; padding: 10px;">${row.date}</td>
+              <td style="font-weight: 600;">${row.date}</td>
               ${mealTypes.map(mt => `
-                <td style="text-align: center; border: 1px solid #eee; padding: 10px; font-weight: 600; color: ${row.totals[mt.id] > 0 ? 'var(--dark-bg)' : '#ccc'};">
+                <td style="text-align: center; font-weight: 500; color: ${row.totals[mt.id] > 0 ? 'var(--text)' : 'var(--muted)'};">
                   ${row.totals[mt.id] || 0}
                 </td>
               `).join('')}
-              <td style="text-align: center; border: 1px solid #eee; padding: 10px; background: #fafafa; font-weight: 800;">
+              <td style="text-align: center; background: #FAFAFA; font-weight: 700;">
                 ${row.dailyTotal}
               </td>
             </tr>
@@ -3176,13 +2217,13 @@
         html += `
             </tbody>
             <tfoot>
-              <tr style="background: #e5e7eb;">
-                <td style="font-weight: 800; padding: 12px; border: 1px solid #ddd;">PERIOD TOTAL</td>
+              <tr style="background: #F3F4F6;">
+                <td style="font-weight: 700;">PERIOD TOTAL</td>
                 ${mealTypes.map(mt => {
-          const colTotal = rows.reduce((sum, r) => sum + (r.totals[mt.id] || 0), 0);
-          return `<td style="text-align: center; font-weight: 800; padding: 12px; border: 1px solid #ddd;">${colTotal}</td>`;
-        }).join('')}
-                <td style="text-align: center; font-weight: 900; background: var(--dark-bg); color: var(--primary); padding: 12px; border: 1px solid #ddd;">
+                  const colTotal = rows.reduce((sum, r) => sum + (r.totals[mt.id] || 0), 0);
+                  return `<td style="text-align: center; font-weight: 700;">${colTotal}</td>`;
+                }).join('')}
+                <td style="text-align: center; font-weight: 800; background: var(--text); color: white;">
                   ${summary.totalMeals}
                 </td>
               </tr>
@@ -3191,7 +2232,7 @@
         `;
 
         container.innerHTML = html;
-        window.currentMatrixData = data; // Store for printing
+        window.currentMatrixData = data;
       } catch (err) {
         console.error('Matrix load error:', err);
         container.innerHTML = `<div class="error-msg">Error: ${err.message}</div>`;
@@ -3200,10 +2241,7 @@
 
     function printDailyMatrixReport() {
       const data = window.currentMatrixData;
-      if (!data) {
-        alert('Please load the report first.');
-        return;
-      }
+      if (!data) { alert('Please load the report first.'); return; }
 
       const printWindow = window.open('', '_blank');
       const currentDate = new Date().toLocaleString();
@@ -3230,31 +2268,19 @@
         <html>
           <head>
             <title>Daily Meal Matrix Report</title>
+            <link rel="preconnect" href="https://fonts.googleapis.com">
+            <link href="https://fonts.googleapis.com/css2?family=Anton&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
             <style>
-              body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #333; }
-              .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; }
-              h1 { margin: 0; color: #1a1a1a; letter-spacing: 2px; }
-              .meta { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 14px; }
+              body { font-family: 'Manrope', sans-serif; padding: 30px; color: #111827; }
+              h1 { font-family: 'Anton', sans-serif; margin: 0; letter-spacing: 1px; text-transform: uppercase; }
               table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-              th { background: #1a1a1a; color: white; padding: 12px; text-align: left; font-size: 12px; text-transform: uppercase; }
-              td { padding: 10px; border: 1px solid #ddd; font-size: 13px; }
-              tr:nth-child(even) { background: #f9f9f9; }
-              .footer { margin-top: 40px; text-align: center; font-size: 11px; color: #777; border-top: 1px solid #ddd; padding-top: 20px; }
-              @media print {
-                .no-print { display: none; }
-                body { padding: 0; }
-              }
+              th { background: #111827; color: white; padding: 10px; font-size: 11px; text-transform: uppercase; }
+              td { padding: 8px 10px; border: 1px solid #E5E7EB; font-size: 13px; }
             </style>
           </head>
           <body>
-            <div class="header">
-              <h1>MEAL TICKETS SYSTEM</h1>
-              <p>Daily Meal Matrix Summary Report</p>
-            </div>
-            <div class="meta">
-              <div><strong>Generated:</strong> ${currentDate}</div>
-              <div><strong>Period:</strong> ${data.startDate} to ${data.endDate}</div>
-            </div>
+            <h1>MEAL TICKETS SYSTEM</h1>
+            <p style="color:#6B7280; font-size:13px;">Daily Meal Matrix Summary Report · Generated ${currentDate}</p>
             <table>
               <thead>
                 <tr>
@@ -3263,26 +2289,16 @@
                   <th style="text-align:center">Total</th>
                 </tr>
               </thead>
-              <tbody>
-                ${tableRows}
-              </tbody>
-              <tfoot>
-                <tr style="background:#eee">${footCols}</tr>
-              </tfoot>
+              <tbody>${tableRows}</tbody>
+              <tfoot><tr style="background:#F3F4F6">${footCols}</tr></tfoot>
             </table>
-            <div class="footer">
-              Generated by Meal Ticket Management System Admin Dashboard
-            </div>
             <script>window.onload = () => { window.print(); };<\/script>
           </body>
         </html>
       `);
       printWindow.document.close();
     }
-
-
   </script>
-
 </body>
 
 </html>

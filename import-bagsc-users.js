@@ -59,7 +59,8 @@ async function importUsers() {
           const allocId = generateId();
           await dbRun(
             `INSERT INTO meal_allocations (id, user_id, meal_type_id, allocated, remaining)
-             VALUES (?, ?, ?, 12, 12)`,
+             VALUES (?, ?, ?, 12, 12)
+             ON CONFLICT (user_id, meal_type_id) DO NOTHING`,
             [allocId, id, mt.id]
           );
         }

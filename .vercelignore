@@ -1,0 +1,10 @@
+.env
+.env.*
+*.db
+*.db-shm
+*.db-wal
+*.log
+node_modules
+add-indexes-postgres.js
+.vercel
+.git

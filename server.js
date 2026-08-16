@@ -4,6 +4,9 @@
  * Run: npm install && node setup-db.js && npm start
  */
 
+// Expand the libuv threadpool so CPU-bound work (bcrypt, QR, ZIP) is faster
+process.env.UV_THREADPOOL_SIZE = process.env.UV_THREADPOOL_SIZE || '12';
+
 const express = require('express');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
@@ -20,8 +23,17 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.static('public'));
+app.use(express.json({ limit: '20mb' }));
+app.use(express.static('public', {
+  setHeaders: (res, filePath) => {
+    // Long-lived cache for hashed/unversioned assets, revalidate HTML
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache');
+    } else {
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+    }
+  }
+}));
 
 // Input Sanitization & Validation
 const sanitizeString = (str, maxLen = 100) => {
@@ -912,7 +924,7 @@ app.get('/api/admin/dashboard', authenticateSession, async (req, res) => {
         
         SELECT 
           ec.id,
-          DATE(ec.consumed_at) as transaction_date,
+          DATE(ec.consumed_at)::text as transaction_date,
           TO_CHAR(ec.consumed_at, 'HH24:MI:SS') as transaction_time,
           u.id as user_id,
           u.name as user_name,
@@ -1591,7 +1603,7 @@ app.get('/api/admin/stats/meals-per-day', authenticateSession, async (req, res) 
     // Event consumptions
     const eventStats = await dbAll(
       `SELECT 
-        DATE(ec.consumed_at) as date,
+        DATE(ec.consumed_at)::text as date,
         mt.name as meal_type,
         mt.id as meal_type_id,
         COUNT(ec.id) as count,
@@ -1685,7 +1697,7 @@ app.get('/api/admin/stats/daily-matrix', authenticateSession, async (req, res) =
         
         UNION ALL
         
-        SELECT DATE(consumed_at) as date, meal_type_id, COUNT(*) as count
+        SELECT DATE(consumed_at)::text as date, meal_type_id, COUNT(*) as count
         FROM event_consumptions
         WHERE DATE(consumed_at) >= ? AND DATE(consumed_at) <= ?
         GROUP BY DATE(consumed_at), meal_type_id
@@ -2027,9 +2039,15 @@ app.get('/api/admin/users', authenticateSession, async (req, res) => {
         u.name,
         u.active,
         u.accommodation,
-        (SELECT token FROM qr_tokens WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1) as latest_token,
-        (SELECT expires_at FROM qr_tokens WHERE user_id = u.id ORDER BY created_at DESC LIMIT 1) as token_expiry
+        qt.token as latest_token,
+        qt.expires_at as token_expiry
        FROM users u
+       LEFT JOIN LATERAL (
+         SELECT token, expires_at FROM qr_tokens
+         WHERE user_id = u.id
+         ORDER BY created_at DESC
+         LIMIT 1
+       ) qt ON true
        ORDER BY u.created_at DESC`,
       []
     );
@@ -2233,12 +2251,26 @@ app.get('/api/admin/events/:eventId', authenticateSession, async (req, res) => {
     }
     const registrations = await dbAll(
       `SELECT er.id, er.user_id, u.registration_number, u.name,
-              (SELECT token FROM event_qr_tokens WHERE event_id = ? AND user_id = u.id) as qr_token,
-              (SELECT COUNT(*) FROM event_consumptions WHERE event_id = ? AND user_id = u.id) as consumed_count
+              eq.token as qr_token,
+              COALESCE(ec.consumed, 0) as consumed_count,
+              COALESCE(ma.total_allocated, 0) as allocated_total,
+              COALESCE(ma.total_remaining, 0) as remaining_total
        FROM event_registrations er
        JOIN users u ON er.user_id = u.id
-       WHERE er.event_id = ?`,
-      [event.id, event.id, event.id]
+       LEFT JOIN event_qr_tokens eq ON eq.event_id = er.event_id AND eq.user_id = u.id
+       LEFT JOIN LATERAL (
+         SELECT COUNT(*) as consumed
+         FROM event_consumptions
+         WHERE event_id = er.event_id AND user_id = u.id
+       ) ec ON true
+       LEFT JOIN LATERAL (
+         SELECT SUM(allocated) as total_allocated, SUM(remaining) as total_remaining
+         FROM meal_allocations
+         WHERE user_id = u.id
+       ) ma ON true
+       WHERE er.event_id = ?
+       ORDER BY u.name`,
+      [event.id]
     );
     res.json({ ...event, registrations });
   } catch (err) {
@@ -2265,15 +2297,24 @@ app.post('/api/admin/events/:eventId/registrations', authenticateSession, async 
     if (!event) {
       return res.status(404).json({ error: 'Event not found' });
     }
-    let added = 0;
+
+    // Batch insert registrations in a single query
+    const values = [];
+    const params = [];
     for (const userId of userIds) {
+      params.push(generateId(), eventId, userId);
+      values.push('(?, ?, ?)');
+    }
+
+    let added = 0;
+    if (values.length > 0) {
       const result = await dbRun(
         `INSERT INTO event_registrations (id, event_id, user_id)
-         VALUES (?, ?, ?)
+         VALUES ${values.join(', ')}
          ON CONFLICT (event_id, user_id) DO NOTHING`,
-        [generateId(), eventId, userId]
+        params
       );
-      if (result && result.changes > 0) added++;
+      added = result.changes || 0;
     }
     res.json({ success: true, added, total: userIds.length });
   } catch (err) {
@@ -2297,15 +2338,24 @@ app.post('/api/admin/events/:eventId/registrations/all', authenticateSession, as
       return res.status(404).json({ error: 'Event not found' });
     }
     const users = await dbAll('SELECT id FROM users WHERE active = 1');
-    let added = 0;
+
+    // Batch insert all registrations in a single query
+    const values = [];
+    const params = [];
     for (const user of users) {
+      params.push(generateId(), eventId, user.id);
+      values.push('(?, ?, ?)');
+    }
+
+    let added = 0;
+    if (values.length > 0) {
       const result = await dbRun(
         `INSERT INTO event_registrations (id, event_id, user_id)
-         VALUES (?, ?, ?)
+         VALUES ${values.join(', ')}
          ON CONFLICT (event_id, user_id) DO NOTHING`,
-        [generateId(), eventId, user.id]
+        params
       );
-      if (result && result.changes > 0) added++;
+      added = result.changes || 0;
     }
     res.json({ success: true, added, total: users.length });
   } catch (err) {
@@ -2361,22 +2411,29 @@ app.post('/api/admin/events/:eventId/generate-qr', authenticateSession, async (r
       'SELECT user_id FROM event_registrations WHERE event_id = ?',
       [eventId]
     );
+    const existing = await dbAll(
+      'SELECT user_id FROM event_qr_tokens WHERE event_id = ?',
+      [eventId]
+    );
+    const existingSet = new Set(existing.map(r => r.user_id));
+    const missing = registrations.filter(r => !existingSet.has(r.user_id));
+
+    const values = [];
+    const params = [];
+    for (const reg of missing) {
+      params.push(generateId(), eventId, reg.user_id, generateToken());
+      values.push('(?, ?, ?, ?)');
+    }
+
     let generated = 0;
-    for (const reg of registrations) {
-      const existing = await dbGet(
-        'SELECT id FROM event_qr_tokens WHERE event_id = ? AND user_id = ?',
-        [eventId, reg.user_id]
+    if (values.length > 0) {
+      const result = await dbRun(
+        `INSERT INTO event_qr_tokens (id, event_id, user_id, token)
+         VALUES ${values.join(', ')}
+         ON CONFLICT (event_id, user_id) DO NOTHING`,
+        params
       );
-      if (!existing) {
-        const tokenId = generateId();
-        const token = generateToken();
-        await dbRun(
-          `INSERT INTO event_qr_tokens (id, event_id, user_id, token)
-           VALUES (?, ?, ?, ?)`,
-          [tokenId, eventId, reg.user_id, token]
-        );
-        generated++;
-      }
+      generated = result.changes;
     }
     res.json({ success: true, generated, total: registrations.length });
   } catch (err) {
@@ -2553,20 +2610,21 @@ app.post('/api/admin/events/:eventId/qr-batch-zip', authenticateSession, async (
     const zip = new JSZip();
     let added = 0;
 
-    for (const userId of userIds) {
-      const user = await dbGet(
-        'SELECT id, name, registration_number FROM users WHERE id = ?',
-        [userId]
-      );
-      if (!user) continue;
+    const users = await dbAll(
+      'SELECT id, name, registration_number FROM users WHERE id = ANY($1)',
+      [userIds]
+    );
+    const tokens = await dbAll(
+      'SELECT user_id, token FROM event_qr_tokens WHERE event_id = $1 AND user_id = ANY($2)',
+      [eventId, userIds]
+    );
+    const tokenMap = new Map(tokens.map(t => [t.user_id, t.token]));
 
-      const tokenRow = await dbGet(
-        'SELECT token FROM event_qr_tokens WHERE event_id = ? AND user_id = ?',
-        [eventId, userId]
-      );
-      if (!tokenRow) continue;
+    for (const user of users) {
+      const token = tokenMap.get(user.id);
+      if (!token) continue;
 
-      const qrData = `EVT:${eventId}|REG:${user.registration_number}|TOKEN:${tokenRow.token}`;
+      const qrData = `EVT:${eventId}|REG:${user.registration_number}|TOKEN:${token}`;
       const qrBuffer = await QRCode.toBuffer(qrData, {
         width: 400,
         margin: 2,
@@ -2760,7 +2818,7 @@ app.get('/api/admin/events/:eventId/consumption-report', authenticateSession, as
       event,
       summary,
       detail: report,
-      totalRegistrations: report.length > 0 ? Math.max(...report.map(r => r.user_id).filter((v, i, a) => a.indexOf(v) === i).length) : 0,
+      totalRegistrations: new Set(report.map(r => r.user_id)).size,
       timestamp: new Date().toISOString()
     });
   } catch (err) {
@@ -2956,8 +3014,8 @@ app.get('/api/admin/reconciliation/validate', authenticateSession, async (req, r
       JOIN users u ON ma.user_id = u.id
       JOIN meal_types mt ON ma.meal_type_id = mt.id
       LEFT JOIN transactions t ON ma.user_id = t.user_id AND ma.meal_type_id = t.meal_type_id
-      GROUP BY ma.user_id, ma.meal_type_id, ma.allocated, ma.remaining
-      HAVING discrepancy > 0
+      GROUP BY ma.user_id, u.registration_number, u.name, ma.meal_type_id, mt.name, ma.allocated, ma.remaining
+      HAVING ABS((ma.allocated - COUNT(t.id)) - ma.remaining) > 0
     `);
 
     if (discrepancies.length > 0) {
@@ -2974,10 +3032,10 @@ app.get('/api/admin/reconciliation/validate', authenticateSession, async (req, r
     const unconfirmed = await dbAll(`
       SELECT 
         er.event_id,
-        e.name as event_name,
+        MAX(e.name) as event_name,
         er.user_id,
-        u.registration_number,
-        u.name as user_name,
+        MAX(u.registration_number) as registration_number,
+        MAX(u.name) as user_name,
         COUNT(ec.id) as meals_consumed,
         (SELECT COUNT(*) FROM meal_types WHERE active = 1) as total_meal_types
       FROM event_registrations er
@@ -2985,7 +3043,7 @@ app.get('/api/admin/reconciliation/validate', authenticateSession, async (req, r
       JOIN users u ON er.user_id = u.id
       LEFT JOIN event_consumptions ec ON er.event_id = ec.event_id AND er.user_id = ec.user_id
       GROUP BY er.event_id, er.user_id
-      HAVING meals_consumed < (SELECT COUNT(*) FROM meal_types WHERE active = 1)
+      HAVING COUNT(ec.id) < (SELECT COUNT(*) FROM meal_types WHERE active = 1)
       LIMIT 20
     `);
 
@@ -3063,45 +3121,47 @@ app.post('/api/admin/sync/meal-allocations', authenticateSession, async (req, re
       return res.status(403).json({ error: 'Not an admin session' });
     }
 
-    const allocations = await dbAll(`
-      SELECT DISTINCT ma.id, ma.user_id, ma.meal_type_id, ma.allocated 
-      FROM meal_allocations ma
-    `);
-
     let updated = 0;
     let errors = [];
 
-    for (const alloc of allocations) {
-      try {
-        const consumed = await dbGet(`
-          SELECT COUNT(*) as count FROM transactions 
-          WHERE user_id = ? AND meal_type_id = ?
-        `, [alloc.user_id, alloc.meal_type_id]);
+    try {
+      // Set-based recalculation - allocations that have transactions
+      const withTx = await dbRun(`
+        UPDATE meal_allocations ma
+        SET remaining = ma.allocated - COALESCE(t.count, 0),
+            consumed_count = COALESCE(t.count, 0),
+            updated_at = NOW()
+        FROM (
+          SELECT user_id, meal_type_id, COUNT(*) as count
+          FROM transactions
+          GROUP BY user_id, meal_type_id
+        ) t
+        WHERE ma.user_id = t.user_id AND ma.meal_type_id = t.meal_type_id
+      `);
+      updated += withTx.changes || 0;
 
-        const consumedCount = consumed?.count || 0;
-        const newRemaining = (alloc.allocated || 0) - consumedCount;
-
-        await dbRun(`
-          UPDATE meal_allocations 
-          SET remaining = ?, consumed_count = ?, updated_at = NOW()
-          WHERE id = ?
-        `, [newRemaining, consumedCount, alloc.id]);
-
-        updated++;
-      } catch (err) {
-        errors.push({
-          allocation_id: alloc.id,
-          user_id: alloc.user_id,
-          meal_type_id: alloc.meal_type_id,
-          error: err.message
-        });
-      }
+      // Allocations with no transactions - reset to full balance
+      const noTx = await dbRun(`
+        UPDATE meal_allocations ma
+        SET remaining = ma.allocated,
+            consumed_count = 0,
+            updated_at = NOW()
+        WHERE NOT EXISTS (
+          SELECT 1 FROM transactions t
+          WHERE t.user_id = ma.user_id AND t.meal_type_id = ma.meal_type_id
+        )
+      `);
+      updated += noTx.changes || 0;
+    } catch (err) {
+      errors.push({ error: err.message });
     }
+
+    const totalAllocations = await dbGet('SELECT COUNT(*) as count FROM meal_allocations');
 
     res.json({
       success: true,
       updated,
-      totalAllocations: allocations.length,
+      totalAllocations: totalAllocations?.count || 0,
       errorCount: errors.length,
       errors: errors.length > 0 ? errors : null,
       timestamp: new Date().toISOString()
@@ -3242,8 +3302,8 @@ app.post('/api/admin/users/bulk-import', authenticateSession, async (req, res) =
     // Get meal types once
     const mealTypes = createAllocations ? await dbAll('SELECT id FROM meal_types WHERE active = 1') : [];
 
-    // Process in batches of 50
-    const BATCH_SIZE = 50;
+    // Process in batches - large batches minimize DB round trips
+    const BATCH_SIZE = 200;
     for (let i = 0; i < users.length; i += BATCH_SIZE) {
       const batch = users.slice(i, i + BATCH_SIZE);
 
@@ -3255,48 +3315,84 @@ app.post('/api/admin/users/bulk-import', authenticateSession, async (req, res) =
         })
       );
 
-      for (const u of hashedUsers) {
-        if (existingRegNums.has(u.registrationNumber)) {
-          skipped++;
-          continue;
+      const toInsert = hashedUsers.filter(u => !existingRegNums.has(u.registrationNumber));
+      if (toInsert.length === 0) {
+        skipped += hashedUsers.length;
+        continue;
+      }
+
+      try {
+        // Multi-row user insert - returns only rows actually inserted
+        const userValues = [];
+        const userParams = [];
+        for (const u of toInsert) {
+          userParams.push(generateId(), u.registrationNumber, u.name, u.pinHash, u.accommodation || 'Y');
+          userValues.push('(?, ?, ?, ?, ?, 1)');
         }
 
-        try {
-          const userId = generateId();
+        const inserted = await dbAll(
+          `INSERT INTO users (id, registration_number, name, pin_hash, accommodation, active)
+           VALUES ${userValues.join(', ')}
+           ON CONFLICT (registration_number) DO NOTHING
+           RETURNING id, registration_number`,
+          userParams
+        );
 
-          await dbRun(
-            `INSERT INTO users (id, registration_number, name, pin_hash, accommodation, active)
-             VALUES (?, ?, ?, ?, ?, 1)
-             ON CONFLICT (registration_number) DO NOTHING`,
-            [userId, u.registrationNumber, u.name, u.pinHash, u.accommodation || 'Y']
-          );
+        const insertedRegNums = new Set(inserted.map(r => r.registration_number));
+        insertedRegNums.forEach(regNum => existingRegNums.add(regNum));
+        imported += inserted.length;
+        skipped += (toInsert.length - inserted.length);
 
-          // Check if insert actually happened (ON CONFLICT may silently skip)
-          const check = await dbGet('SELECT id FROM users WHERE registration_number = ?', [u.registrationNumber]);
-          if (check && check.id !== userId) {
-            skipped++;
-            continue;
-          }
-
-          existingRegNums.add(u.registrationNumber);
-
-          if (createAllocations && mealTypes.length > 0) {
-            // Batch insert allocations - Y=12, N=4
-            const mealAllocation = (u.accommodation === 'N') ? 4 : 12;
+        if (createAllocations && mealTypes.length > 0 && inserted.length > 0) {
+          // Multi-row meal allocation insert - Y=12, N=4
+          const allocValues = [];
+          const allocParams = [];
+          for (const row of inserted) {
+            const acc = hashedUsers.find(u => u.registrationNumber === row.registration_number)?.accommodation;
+            const mealAllocation = (acc === 'N') ? 4 : 12;
             for (const mt of mealTypes) {
-              const allocId = generateId();
-              await dbRun(
-                `INSERT INTO meal_allocations (id, user_id, meal_type_id, allocated, remaining)
-                 VALUES (?, ?, ?, ?, ?)`,
-                [allocId, userId, mt.id, mealAllocation, mealAllocation]
-              );
+              allocParams.push(generateId(), row.id, mt.id, mealAllocation, mealAllocation);
+              allocValues.push('(?, ?, ?, ?, ?)');
             }
           }
+          await dbRun(
+            `INSERT INTO meal_allocations (id, user_id, meal_type_id, allocated, remaining)
+             VALUES ${allocValues.join(', ')}
+             ON CONFLICT (user_id, meal_type_id) DO NOTHING`,
+            allocParams
+          );
+        }
+      } catch (err) {
+        // Fall back to per-user inserts if the batch insert fails (e.g. size limits)
+        for (const u of toInsert) {
+          try {
+            const userId = generateId();
+            const result = await dbRun(
+              `INSERT INTO users (id, registration_number, name, pin_hash, accommodation, active)
+               VALUES (?, ?, ?, ?, ?, 1)
+               ON CONFLICT (registration_number) DO NOTHING`,
+              [userId, u.registrationNumber, u.name, u.pinHash, u.accommodation || 'Y']
+            );
+            if (!result || result.changes === 0) { skipped++; continue; }
 
-          imported++;
-        } catch (err) {
-          importErrors.push({ user: u.registrationNumber, error: err.message });
-          skipped++;
+            existingRegNums.add(u.registrationNumber);
+            imported++;
+
+            if (createAllocations && mealTypes.length > 0) {
+              const mealAllocation = (u.accommodation === 'N') ? 4 : 12;
+              for (const mt of mealTypes) {
+                await dbRun(
+                  `INSERT INTO meal_allocations (id, user_id, meal_type_id, allocated, remaining)
+                   VALUES (?, ?, ?, ?, ?)
+                   ON CONFLICT (user_id, meal_type_id) DO NOTHING`,
+                  [generateId(), userId, mt.id, mealAllocation, mealAllocation]
+                );
+              }
+            }
+          } catch (err2) {
+            importErrors.push({ user: u.registrationNumber, error: err2.message });
+            skipped++;
+          }
         }
       }
     }
