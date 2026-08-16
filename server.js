@@ -76,6 +76,11 @@ const validateName = (name) => {
 
 // ===== TIME UTILITY FUNCTIONS =====
 
+// Meal schedules are entered in the school's local timezone (Africa/Harare,
+// UTC+2, no DST). Evaluate "now" in that timezone regardless of where the
+// server runs (local dev vs Vercel regions).
+const APP_TIMEZONE = process.env.TIMEZONE || 'Africa/Harare';
+
 function timeStringToSeconds(timeStr) {
   if (!timeStr || typeof timeStr !== 'string') return null;
   const [hours, minutes] = timeStr.split(':').map(Number);
@@ -84,8 +89,20 @@ function timeStringToSeconds(timeStr) {
 }
 
 function getCurrentTimeInSeconds() {
-  const now = new Date();
-  return (now.getHours() * 3600) + (now.getMinutes() * 60) + now.getSeconds();
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: APP_TIMEZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23'
+  }).formatToParts(new Date());
+
+  const get = (type) => {
+    const part = parts.find(p => p.type === type);
+    return part ? parseInt(part.value, 10) : 0;
+  };
+
+  return (get('hour') * 3600) + (get('minute') * 60) + get('second');
 }
 
 function isTimeInRange(currentSeconds, startTime, endTime) {
