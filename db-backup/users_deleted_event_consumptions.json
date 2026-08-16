@@ -1,0 +1,18 @@
+[
+  {
+    "id": "79914d1ce1d3a8d3",
+    "event_id": "EV6DFF64",
+    "user_id": "e9ca9ecaa388c286",
+    "meal_type_id": "MT001",
+    "consumed_at": "2026-08-14T09:59:51.362Z",
+    "vendor_id": "d73c54757a460aa7"
+  },
+  {
+    "id": "abc8db432a9b1e63",
+    "event_id": "EV6DFF64",
+    "user_id": "e9ca9ecaa388c286",
+    "meal_type_id": "MT001",
+    "consumed_at": "2026-08-14T09:59:52.186Z",
+    "vendor_id": "d73c54757a460aa7"
+  }
+]

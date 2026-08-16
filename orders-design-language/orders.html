@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Orders · AE Tracker</title>
+  <meta name="description" content="Manage all sales orders – add, edit, update status and delete orders.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .actions-cell {
+      display: flex;
+      gap: 4px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <a class="logo" href="index.html">AE<span>.</span> Tracker</a>
+    <div class="nav-section">Main</div>
+    <a class="nav-item" href="index.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="7" height="7" />
+        <rect x="14" y="3" width="7" height="7" />
+        <rect x="3" y="14" width="7" height="7" />
+        <rect x="14" y="14" width="7" height="7" />
+      </svg>
+      Dashboard
+    </a>
+    <a class="nav-item active" href="orders.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path
+          d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+      </svg>
+      Orders
+    </a>
+    <a class="nav-item" href="customers.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
+      </svg>
+      Customers
+    </a>
+    <a class="nav-item" href="deliveries.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h11a2 2 0 012 2v3" />
+        <rect x="9" y="11" width="14" height="10" rx="2" />
+        <circle cx="12" cy="21" r="1" />
+        <circle cx="20" cy="21" r="1" />
+      </svg>
+      Deliveries
+    </a>
+    <div class="nav-divider"></div>
+    <div class="nav-section">Reports</div>
+    <a class="nav-item" href="revenue.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+      </svg>
+      Revenue
+    </a>
+    <a class="nav-item" href="settings.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="3" />
+        <path
+          d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" />
+      </svg>
+      Settings
+    </a>
+    <div class="sidebar-footer">
+      <div class="avatar" id="sidebarAvatar">AE</div>
+      <div class="avatar-info" style="flex:1;min-width:0">
+        <div class="name" id="sidebarName">Admin</div>
+        <div class="role" id="sidebarBranch" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Campus Branch</div>
+      </div>
+      <button onclick="DB.logout(); window.location.href='login.html'" title="Logout" style="cursor:pointer;border:none;background:transparent;color:var(--muted);padding:4px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <header class="topbar">
+      <div class="topbar-title">Orders</div>
+      <div class="topbar-right">
+        <button class="btn" onclick="exportCSV()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          Export
+        </button>
+        <button class="btn btn-primary" onclick="openNewOrder()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+          New Order
+        </button>
+      </div>
+    </header>
+
+    <div class="content">
+      <div class="page-header">
+        <div class="page-header-left">
+          <h1>All Orders</h1>
+          <p id="orderCount">Loading...</p>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-header">
+          <div class="filter-row">
+            <div class="search-wrap">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <input class="search-input" id="searchInput" placeholder="Search customer, phone…"
+                oninput="applyFilters()">
+            </div>
+            <select class="filter-select" id="statusFilter" onchange="applyFilters()">
+              <option value="all">All statuses</option>
+              <option value="pending">Pending</option>
+              <option value="transit">In Transit</option>
+              <option value="delivered">Delivered</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+            <select class="filter-select" id="paymentFilter" onchange="applyFilters()">
+              <option value="all">All payments</option>
+            </select>
+            <select class="filter-select" id="courierFilter" onchange="applyFilters()">
+              <option value="all">All couriers</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="overflow-x:auto;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th onclick="sortBy('date')" style="cursor:pointer">Date ↕</th>
+                <th>Customer</th>
+                <th>Phone</th>
+                <th>Payment</th>
+                <th onclick="sortBy('courierId')" style="cursor:pointer">Courier ↕</th>
+                <th onclick="sortBy('amount')" style="cursor:pointer">Amount ↕</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="orderBody"></tbody>
+          </table>
+        </div>
+
+        <div class="pagination">
+          <span class="page-info" id="pageInfo"></span>
+          <div id="pageBtns"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ORDER MODAL -->
+  <div class="modal-overlay" id="orderModal" onclick="if(event.target===this)closeModal()">
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <div class="modal-title" id="modalTitle">New Order</div>
+        <button class="modal-close" onclick="closeModal()">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="grid-2">
+          <div class="form-field">
+            <label class="form-label">Customer Name</label>
+            <input class="form-input" id="f-customer" placeholder="Full name">
+          </div>
+          <div class="form-field">
+            <label class="form-label">Phone</label>
+            <input class="form-input" id="f-phone" placeholder="265 8XX XXX XXX">
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="form-field">
+            <label class="form-label">Amount (MK) *</label>
+            <input class="form-input" id="f-amount" type="number" placeholder="0" min="0">
+          </div>
+          <div class="form-field">
+            <label class="form-label">Payment Method</label>
+            <select class="form-select" id="f-payment"></select>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="form-field">
+            <label class="form-label">Location</label>
+            <input class="form-input" id="f-location" value="Campus">
+          </div>
+          <div class="form-field">
+            <label class="form-label">Courier</label>
+            <select class="form-select" id="f-courier"></select>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="form-field">
+            <label class="form-label">Date</label>
+            <input class="form-input" id="f-date" type="date">
+          </div>
+          <div class="form-field">
+            <label class="form-label">Status</label>
+            <select class="form-select" id="f-status">
+              <option value="transit">In Transit</option>
+              <option value="pending">Pending</option>
+              <option value="delivered">Delivered</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-field">
+          <label class="form-label">Notes</label>
+          <input class="form-input" id="f-notes" placeholder="Any delivery notes...">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" id="modalSubmitBtn" onclick="submitOrder()">Add Order</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONFIRM DELETE -->
+  <div class="confirm-overlay" id="confirmOverlay">
+    <div class="confirm-box">
+      <div class="confirm-body">
+        <div class="confirm-title">Delete Order</div>
+        <div class="confirm-msg">Are you sure you want to delete this order? This cannot be undone.</div>
+      </div>
+      <div class="confirm-footer">
+        <button class="btn" onclick="closeConfirm()">Cancel</button>
+        <button class="btn btn-danger" onclick="confirmDelete()">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="db.js"></script>
+  <script>
+    const user = DB.getCurrentUser();
+    if (!user) window.location.href = 'login.html';
+    else if (user.role === 'courier') window.location.href = 'courier_dashboard.html';
+
+    const PAGE_SIZE = 20;
+    let filtered = [], currentPage = 1, sortKey = 'date', sortDir = -1, editingOrderId = null, deletingOrderId = null;
+
+    function fmt(n) { return 'MK ' + Number(n).toLocaleString(); }
+    function fmtDate(d) {
+      if (!d) return '—';
+      return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+    function statusBadge(s) {
+      const map = { delivered: 'status-delivered', transit: 'status-transit', pending: 'status-pending', cancelled: 'status-cancelled' };
+      const lbl = { delivered: 'Delivered', transit: 'In Transit', pending: 'Pending', cancelled: 'Cancelled' };
+      return `<span class="status ${map[s] || 'status-pending'}"><span class="status-dot"></span>${lbl[s] || s}</span>`;
+    }
+    function getCourierName(id) {
+      if (!id) return '—';
+      const c = DB.getCouriers().find(x => x.id === id);
+      return c ? c.name : '—';
+    }
+
+    function initFilters() {
+      const pm = document.getElementById('paymentFilter');
+      pm.innerHTML = '<option value="all">All payments</option>' +
+        DB.getPayments().map(p => `<option value="${p}">${p}</option>`).join('');
+      const cf = document.getElementById('courierFilter');
+      cf.innerHTML = '<option value="all">All couriers</option>' +
+        DB.getCouriers().map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    }
+
+    function populateOrderForm() {
+      document.getElementById('f-payment').innerHTML = DB.getPayments()
+        .map(p => `<option value="${p}">${p}</option>`).join('');
+      document.getElementById('f-courier').innerHTML =
+        '<option value="">— Unassigned —</option>' +
+        DB.getCouriers().filter(c => c.active).map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    }
+
+    function sortBy(key) {
+      if (sortKey === key) sortDir *= -1;
+      else { sortKey = key; sortDir = -1; }
+      applyFilters();
+    }
+
+    function applyFilters() {
+      const q = document.getElementById('searchInput').value.toLowerCase();
+      const status = document.getElementById('statusFilter').value;
+      const payment = document.getElementById('paymentFilter').value;
+      const courier = document.getElementById('courierFilter').value;
+      let orders = DB.getOrders();
+      if (status !== 'all') orders = orders.filter(o => o.status === status);
+      if (payment !== 'all') orders = orders.filter(o => o.payment === payment);
+      if (courier !== 'all') orders = orders.filter(o => String(o.courierId) === courier);
+      if (q) orders = orders.filter(o =>
+        o.customer.toLowerCase().includes(q) || o.phone.includes(q) || o.location.toLowerCase().includes(q)
+      );
+      orders.sort((a, b) => {
+        let va = a[sortKey] || '', vb = b[sortKey] || '';
+        if (typeof va === 'number') return (va - vb) * sortDir;
+        return String(va).localeCompare(String(vb)) * sortDir;
+      });
+      filtered = orders;
+      currentPage = 1;
+      document.getElementById('orderCount').textContent = `${orders.length} order${orders.length !== 1 ? 's' : ''}`;
+      render();
+    }
+
+    function render() {
+      const total = filtered.length;
+      const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+      const start = (currentPage - 1) * PAGE_SIZE;
+      const slice = filtered.slice(start, start + PAGE_SIZE);
+
+      document.getElementById('pageInfo').textContent =
+        `Showing ${start + 1}–${Math.min(start + PAGE_SIZE, total)} of ${total}`;
+
+      document.getElementById('orderBody').innerHTML = slice.length ? slice.map(o => `
+    <tr>
+      <td class="td-no">#${String(o.id).padStart(3, '0')}</td>
+      <td class="td-muted">${fmtDate(o.date)}</td>
+      <td class="td-name">${o.customer}</td>
+      <td class="td-muted">${o.phone}</td>
+      <td><span class="payment-pill">${o.payment}</span></td>
+      <td class="td-muted">${getCourierName(o.courierId)}</td>
+      <td class="td-amount">${fmt(o.amount)}</td>
+      <td>${statusBadge(o.status)}</td>
+      <td>
+        <div class="actions-cell">
+          <button class="btn btn-sm btn-icon" title="Quick status" onclick="cycleStatus(${o.id})">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+          <button class="btn btn-sm btn-icon" title="Edit" onclick="openEdit(${o.id})">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button class="btn btn-sm btn-icon" title="Delete" onclick="openConfirm(${o.id})" style="color:var(--danger)">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+          </button>
+        </div>
+      </td>
+    </tr>
+  `).join('') : `<tr><td colspan="9"><div class="empty-state">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+    <p>No orders match your filters</p>
+    </div></td></tr>`;
+
+      // pagination
+      let btns = '';
+      for (let i = 1; i <= pages; i++) {
+        if (pages > 7 && i > 2 && i < pages - 1 && Math.abs(i - currentPage) > 1) {
+          if (i === 3 || i === pages - 2) btns += `<span style="padding:0 4px;color:var(--muted)">…</span>`;
+          continue;
+        }
+        btns += `<button class="page-btn${i === currentPage ? ' active' : ''}" onclick="goPage(${i})">${i}</button>`;
+      }
+      document.getElementById('pageBtns').innerHTML = btns;
+    }
+
+    function goPage(n) { currentPage = n; render(); window.scrollTo(0, 0); }
+
+    function cycleStatus(id) {
+      const order = DB.getOrders().find(o => o.id === id);
+      if (!order) return;
+      const cycle = ['pending', 'transit', 'delivered'];
+      const next = cycle[(cycle.indexOf(order.status) + 1) % cycle.length];
+      DB.updateOrder(id, { status: next });
+      applyFilters();
+      showToast(`Order #${String(id).padStart(3, '0')} → ${next}`, 'success');
+    }
+
+    function openNewOrder() {
+      editingOrderId = null;
+      document.getElementById('modalTitle').textContent = 'New Order';
+      document.getElementById('modalSubmitBtn').textContent = 'Add Order';
+      populateOrderForm();
+      ['f-customer', 'f-phone', 'f-amount', 'f-notes'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('f-location').value = 'Campus';
+      document.getElementById('f-date').value = new Date().toISOString().split('T')[0];
+      document.getElementById('f-status').value = 'transit';
+      document.getElementById('orderModal').classList.add('open');
+    }
+
+    function openEdit(id) {
+      const o = DB.getOrders().find(x => x.id === id);
+      if (!o) return;
+      editingOrderId = id;
+      document.getElementById('modalTitle').textContent = `Edit Order #${String(id).padStart(3, '0')}`;
+      document.getElementById('modalSubmitBtn').textContent = 'Save Changes';
+      populateOrderForm();
+      document.getElementById('f-customer').value = o.customer !== 'Unknown' ? o.customer : '';
+      document.getElementById('f-phone').value = o.phone !== '—' ? o.phone : '';
+      document.getElementById('f-amount').value = o.amount;
+      document.getElementById('f-payment').value = o.payment;
+      document.getElementById('f-location').value = o.location;
+      document.getElementById('f-courier').value = o.courierId || '';
+      document.getElementById('f-date').value = o.date;
+      document.getElementById('f-status').value = o.status;
+      document.getElementById('f-notes').value = o.notes || '';
+      document.getElementById('orderModal').classList.add('open');
+    }
+
+    function closeModal() { document.getElementById('orderModal').classList.remove('open'); }
+
+    function submitOrder() {
+      const amount = parseFloat(document.getElementById('f-amount').value);
+      if (!amount || amount <= 0) { showToast('Please enter a valid amount', 'danger'); return; }
+      const courierId = parseInt(document.getElementById('f-courier').value) || null;
+      const order = {
+        date: document.getElementById('f-date').value,
+        customer: document.getElementById('f-customer').value.trim() || 'Unknown',
+        phone: document.getElementById('f-phone').value.trim() || '—',
+        location: document.getElementById('f-location').value.trim() || 'Campus',
+        payment: document.getElementById('f-payment').value,
+        courierId, amount,
+        status: document.getElementById('f-status').value,
+        notes: document.getElementById('f-notes').value.trim(),
+      };
+      if (editingOrderId) {
+        DB.updateOrder(editingOrderId, order);
+        showToast(`Order #${String(editingOrderId).padStart(3, '0')} updated`, 'success');
+      } else {
+        const added = DB.addOrder(order);
+        showToast(`Order #${String(added.id).padStart(3, '0')} added`, 'success');
+      }
+      closeModal();
+      applyFilters();
+    }
+
+    function openConfirm(id) { deletingOrderId = id; document.getElementById('confirmOverlay').classList.add('open'); }
+    function closeConfirm() { deletingOrderId = null; document.getElementById('confirmOverlay').classList.remove('open'); }
+    function confirmDelete() {
+      DB.deleteOrder(deletingOrderId);
+      showToast('Order deleted');
+      closeConfirm();
+      applyFilters();
+    }
+
+    function exportCSV() {
+      const rows = [['#', 'Date', 'Customer', 'Phone', 'Location', 'Payment', 'Courier', 'Amount', 'Status', 'Notes']];
+      DB.getOrders().forEach(o => rows.push([
+        o.id, o.date, o.customer, o.phone, o.location, o.payment,
+        getCourierName(o.courierId), o.amount, o.status, o.notes || ''
+      ]));
+      const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+      a.download = 'AE_Orders_Export.csv';
+      a.click();
+      showToast('Exported as CSV', 'success');
+    }
+
+    function showToast(msg, type = '') {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = 'toast show' + (type ? ' toast-' + type : '');
+      clearTimeout(t._t);
+      t._t = setTimeout(() => { t.className = 'toast'; }, 2800);
+    }
+
+    const s = DB.getSettings();
+    document.getElementById('sidebarName').textContent = s.adminName || 'Admin';
+    document.getElementById('sidebarBranch').textContent = s.branch || 'Campus Branch';
+    document.getElementById('sidebarAvatar').textContent = (s.adminName || 'AE').slice(0, 2).toUpperCase();
+
+    initFilters();
+    applyFilters();
+  </script>
+</body>
+
+</html>
