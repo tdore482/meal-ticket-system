@@ -526,7 +526,13 @@
                   <h3 class="section-title">Consolidated Meal Report</h3>
                   <p style="font-size:12px; color:var(--muted); margin-top:2px;">Exhaustive transaction records grouped by meal periods.</p>
                 </div>
-                <button class="btn btn-sm btn-primary" onclick="window.print()">Print Report</button>
+                <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                  <select class="form-input" id="consolidatedEventFilter" style="min-width:180px;">
+                    <option value="">All Events (Legacy + Event)</option>
+                  </select>
+                  <button class="btn btn-accent" onclick="renderConsolidatedReport()">Load</button>
+                  <button class="btn btn-sm btn-primary" onclick="printConsolidatedReport()">Print Report</button>
+                </div>
               </div>
               <div style="padding: 1.5rem;" id="consolidatedReportContainer">
                 <div class="loading" style="text-align:center; color:var(--muted);">Loading report...</div>
@@ -545,6 +551,9 @@
                   <p style="font-size:12px; color:var(--muted); margin-top:2px;">Cross-tabulated view of meals served daily per category.</p>
                 </div>
                 <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                  <select class="form-input" id="matrixEventFilter" style="min-width:180px;">
+                    <option value="">All Events</option>
+                  </select>
                   <input type="date" class="form-input" id="matrixStartDate">
                   <input type="date" class="form-input" id="matrixEndDate">
                   <button class="btn btn-accent" onclick="loadDailyMatrixReport()">Load</button>
@@ -1150,14 +1159,36 @@
       container.innerHTML = '<div class="loading" style="text-align:center; padding:1.5rem; color:var(--muted);">Generating full report...</div>';
 
       try {
-        const data = await apiCall('/admin/consolidated-report');
-        const { mealTypes, grouped, totalCount } = data;
+        const eventId = document.getElementById('consolidatedEventFilter').value;
+        let url = '/admin/consolidated-report';
+        if (eventId) url += `?eventId=${encodeURIComponent(eventId)}`;
+
+        const data = await apiCall(url);
+        const { mealTypes, grouped, totalCount, events, selectedEvent } = data;
+
+        // Populate event filter dropdown (only once or on reload)
+        const eventSelect = document.getElementById('consolidatedEventFilter');
+        if (eventSelect && events && eventSelect.options.length <= 1) {
+          events.forEach(e => {
+            const opt = document.createElement('option');
+            opt.value = e.id;
+            opt.textContent = `${e.name} (${e.start_date} – ${e.end_date})`;
+            eventSelect.appendChild(opt);
+          });
+        }
+        // Restore selected value if a filter was applied
+        if (eventSelect && eventId) eventSelect.value = eventId;
+
+        // Store for print
+        window.currentConsolidatedData = data;
+
+        const eventLabel = selectedEvent ? ` — ${selectedEvent.name}` : ' — All Events (Legacy + Event)';
 
         let html = `
           <div style="margin-bottom: 1.5rem; padding: 1.25rem; background: var(--bg); border-left: 4px solid var(--accent); border-radius:var(--radius);">
             <div style="display: flex; justify-content: space-between; align-items: center;">
               <div>
-                <p style="font-size: 11px; font-weight:600; text-transform: uppercase; color: var(--muted); letter-spacing:0.8px;">Total Transactions Recorded</p>
+                <p style="font-size: 11px; font-weight:600; text-transform: uppercase; color: var(--muted); letter-spacing:0.8px;">Total Transactions Recorded${eventLabel}</p>
                 <p style="font-size: 32px; font-family: 'Anton', sans-serif; color: var(--text);">${totalCount}</p>
               </div>
               <div style="text-align: right;">
@@ -2160,6 +2191,7 @@
     async function loadDailyMatrixReport() {
       let start = document.getElementById('matrixStartDate').value;
       let end = document.getElementById('matrixEndDate').value;
+      const eventId = document.getElementById('matrixEventFilter').value;
       const container = document.getElementById('dailyMatrixContainer');
 
       if (!start || !end) {
@@ -2176,17 +2208,42 @@
 
       try {
         let url = API_BASE + '/admin/stats/daily-matrix';
-        if (start && end) url += `?startDate=${start}&endDate=${end}`;
+        const params = [];
+        if (start) params.push(`startDate=${start}`);
+        if (end) params.push(`endDate=${end}`);
+        if (eventId) params.push(`eventId=${encodeURIComponent(eventId)}`);
+        if (params.length) url += '?' + params.join('&');
 
         const data = await apiCall(url.replace(API_BASE, ''));
-        const { mealTypes, rows, summary } = data;
+        const { mealTypes, rows, summary, events, selectedEvent } = data;
+
+        // Populate event filter dropdown (only once or on reload)
+        const eventSelect = document.getElementById('matrixEventFilter');
+        if (eventSelect && events && eventSelect.options.length <= 1) {
+          events.forEach(e => {
+            const opt = document.createElement('option');
+            opt.value = e.id;
+            opt.textContent = `${e.name} (${e.start_date} – ${e.end_date})`;
+            eventSelect.appendChild(opt);
+          });
+        }
+        if (eventSelect && eventId) eventSelect.value = eventId;
+
+        // Store for print
+        window.currentMatrixData = data;
 
         if (rows.length === 0) {
-          container.innerHTML = '<div style="text-align:center; padding:1.5rem; color:var(--muted);">No transactions found for this period.</div>';
+          const eventLabel = selectedEvent ? ` for ${selectedEvent.name}` : '';
+          container.innerHTML = `<div style="text-align:center; padding:1.5rem; color:var(--muted);">No transactions found for this period${eventLabel}.</div>`;
           return;
         }
 
+        const eventLabel = selectedEvent ? ` — ${selectedEvent.name}` : '';
+
         let html = `
+          <div style="margin-bottom:1rem; font-size:13px; color:var(--muted);">
+            Showing: <strong>${summary.totalMeals}</strong> meals across <strong>${summary.totalDays}</strong> day(s)${eventLabel}
+          </div>
           <table class="data-table">
             <thead>
               <tr>
@@ -2239,6 +2296,80 @@
       }
     }
 
+    function printConsolidatedReport() {
+      const data = window.currentConsolidatedData;
+      if (!data) { alert('Please load the report first.'); return; }
+
+      const printWindow = window.open('', '_blank');
+      const currentDate = new Date().toLocaleString();
+      const eventLabel = data.selectedEvent ? data.selectedEvent.name : 'All Events (Legacy + Event)';
+
+      let tablesHtml = '';
+      data.mealTypes.forEach(mt => {
+        const group = data.grouped[mt.id];
+        const txs = group.transactions;
+
+        let rowsHtml = '';
+        if (txs.length === 0) {
+          rowsHtml = `<tr><td colspan="5" style="text-align:center; padding:12px; color:#9CA3AF;">No transactions for this meal period.</td></tr>`;
+        } else {
+          txs.forEach((tx, i) => {
+            rowsHtml += `
+              <tr>
+                <td>${i + 1}</td>
+                <td>${tx.transaction_date} ${tx.transaction_time}</td>
+                <td>${tx.registration_number}</td>
+                <td>${tx.user_name}</td>
+                <td>${tx.vendor_name}</td>
+              </tr>`;
+          });
+        }
+
+        tablesHtml += `
+          <h3 style="margin: 20px 0 8px; font-family:'Anton',sans-serif; text-transform:uppercase; border-bottom:2px solid #111827; padding-bottom:6px;">
+            ${group.meal_type} <span style="font-size:12px; font-weight:normal; color:#6B7280;">${group.time_range} · ${txs.length} transactions</span>
+          </h3>
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Date/Time</th>
+                <th>REG #</th>
+                <th>Name</th>
+                <th>Vendor</th>
+              </tr>
+            </thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>`;
+      });
+
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Consolidated Meal Report</title>
+            <link rel="preconnect" href="https://fonts.googleapis.com">
+            <link href="https://fonts.googleapis.com/css2?family=Anton&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+            <style>
+              body { font-family: 'Manrope', sans-serif; padding: 30px; color: #111827; }
+              h1 { font-family: 'Anton', sans-serif; margin: 0; letter-spacing: 1px; text-transform: uppercase; }
+              table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+              th { background: #111827; color: white; padding: 8px; font-size: 11px; text-transform: uppercase; }
+              td { padding: 6px 8px; border: 1px solid #E5E7EB; font-size: 12px; }
+            </style>
+          </head>
+          <body>
+            <h1>Consolidated Meal Report</h1>
+            <p style="color:#6B7280; font-size:13px;">Event: <strong>${eventLabel}</strong> · Generated ${currentDate}</p>
+            <p style="font-size:14px;">Total Transactions: <strong>${data.totalCount}</strong></p>
+            ${tablesHtml}
+            <script>window.onload = () => { window.print(); };<\/script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    }
+
     function printDailyMatrixReport() {
       const data = window.currentMatrixData;
       if (!data) { alert('Please load the report first.'); return; }
@@ -2281,6 +2412,7 @@
           <body>
             <h1>MEAL TICKETS SYSTEM</h1>
             <p style="color:#6B7280; font-size:13px;">Daily Meal Matrix Summary Report · Generated ${currentDate}</p>
+            <p style="color:#6B7280; font-size:13px;">Period: ${data.startDate} to ${data.endDate}${data.selectedEvent ? ' · Event: ' + data.selectedEvent.name : ''}</p>
             <table>
               <thead>
                 <tr>

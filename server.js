@@ -655,6 +655,24 @@ app.post('/api/vendor/validate-qr', authenticateSession, async (req, res) => {
       });
     }
 
+    // Check if user already redeemed this meal type today
+    const todayDate = new Date().toISOString().split('T')[0];
+    const existingTodayTx = await dbGet(
+      `SELECT id FROM transactions
+       WHERE user_id = ? AND meal_type_id = ? AND transaction_date = ?`,
+      [user.id, activeMeal.id, todayDate]
+    );
+    if (existingTodayTx) {
+      const mealType = await dbGet(
+        'SELECT name FROM meal_types WHERE id = ?',
+        [activeMeal.id]
+      );
+      return res.status(400).json({
+        status: 'denied',
+        message: `Already redeemed ${mealType.name} today`
+      });
+    }
+
     const newRemaining = allocation.remaining - 1;
     const txId = generateId();
     const txDate = new Date().toISOString().split('T')[0];
@@ -771,9 +789,18 @@ async function handleEventValidation(req, res, { eventId, regNum, tokenStr, meal
     return res.status(400).json({ status: 'denied', message: 'No active meal types configured' });
   }
 
-  // Removed: Check for already consumed meal type.
-  // We now allow users to redeem multiple of the same meal type (e.g. Breakfast on Day 1 and Day 2)
-  // as long as they haven't reached their total limit (currently 10).
+  // Check if user already redeemed this meal type today
+  const todayConsumed = await dbGet(
+    `SELECT id FROM event_consumptions
+     WHERE event_id = ? AND user_id = ? AND meal_type_id = ? AND consumed_at::date = CURRENT_DATE`,
+    [eventId, user.id, mealType.id]
+  );
+  if (todayConsumed) {
+    return res.status(400).json({
+      status: 'denied',
+      message: `Already redeemed ${mealType.name} today`
+    });
+  }
 
   const consumptionId = generateId();
   await dbRun(
@@ -1502,54 +1529,90 @@ app.get('/api/admin/consolidated-report', authenticateSession, async (req, res) 
       return res.status(403).json({ error: 'Not an admin session' });
     }
 
-    // Get all meal types
+    const { eventId } = req.query;
+    const eventFilter = eventId ? sanitizeAlphanumeric(eventId, 50) : null;
+
+    // Get all active meal types
     const mealTypes = await dbAll(`
       SELECT id, name, start_time, end_time 
       FROM meal_types 
       ORDER BY start_time
     `);
 
-    // Get all legacy transactions
-    const legacyTransactions = await dbAll(`
-      SELECT 
-        t.id,
-        t.transaction_date,
-        TO_CHAR(t.transaction_time, 'HH24:MI:SS') as transaction_time,
-        u.name as user_name,
-        u.registration_number,
-        v.name as vendor_name,
-        mt.id as meal_type_id,
-        mt.name as meal_name,
-        'legacy' as mode
-      FROM transactions t
-      JOIN users u ON t.user_id = u.id
-      JOIN vendors v ON t.vendor_id = v.id
-      JOIN meal_types mt ON t.meal_type_id = mt.id
-      ORDER BY t.transaction_date DESC, t.transaction_time DESC
-    `);
+    // Get available events (for filter dropdown)
+    const events = await dbAll(
+      'SELECT id, name, start_date, end_date FROM events WHERE active = 1 ORDER BY start_date DESC'
+    );
 
-    // Get all event consumptions
-    const eventConsumptions = await dbAll(`
-      SELECT 
-        ec.id,
-        DATE(ec.consumed_at) as transaction_date,
-        TO_CHAR(ec.consumed_at, 'HH24:MI:SS') as transaction_time,
-        u.name as user_name,
-        u.registration_number,
-        COALESCE(v.name, 'N/A') as vendor_name,
-        mt.id as meal_type_id,
-        mt.name as meal_name,
-        e.name as event_name,
-        'event' as mode
-      FROM event_consumptions ec
-      JOIN users u ON ec.user_id = u.id
-      JOIN meal_types mt ON ec.meal_type_id = mt.id
-      JOIN events e ON ec.event_id = e.id
-      LEFT JOIN vendors v ON ec.vendor_id = v.id
-      ORDER BY ec.consumed_at DESC
-    `);
+    let allTransactions = [];
+    let selectedEvent = null;
 
-    const allTransactions = [...legacyTransactions, ...eventConsumptions];
+    if (eventFilter) {
+      // When filtering by event, only show event consumptions (legacy transactions have no event_id)
+      selectedEvent = await dbGet('SELECT id, name FROM events WHERE id = ?', [eventFilter]);
+      const eventConsumptions = await dbAll(`
+        SELECT 
+          ec.id,
+          DATE(ec.consumed_at) as transaction_date,
+          TO_CHAR(ec.consumed_at, 'HH24:MI:SS') as transaction_time,
+          u.name as user_name,
+          u.registration_number,
+          COALESCE(v.name, 'N/A') as vendor_name,
+          mt.id as meal_type_id,
+          mt.name as meal_name,
+          e.name as event_name,
+          'event' as mode
+        FROM event_consumptions ec
+        JOIN users u ON ec.user_id = u.id
+        JOIN meal_types mt ON ec.meal_type_id = mt.id
+        JOIN events e ON ec.event_id = e.id
+        LEFT JOIN vendors v ON ec.vendor_id = v.id
+        WHERE ec.event_id = ?
+        ORDER BY ec.consumed_at DESC
+      `, [eventFilter]);
+      allTransactions = eventConsumptions;
+    } else {
+      // No event filter: show all legacy transactions + all event consumptions
+      const legacyTransactions = await dbAll(`
+        SELECT 
+          t.id,
+          t.transaction_date,
+          TO_CHAR(t.transaction_time, 'HH24:MI:SS') as transaction_time,
+          u.name as user_name,
+          u.registration_number,
+          v.name as vendor_name,
+          mt.id as meal_type_id,
+          mt.name as meal_name,
+          'legacy' as mode
+        FROM transactions t
+        JOIN users u ON t.user_id = u.id
+        JOIN vendors v ON t.vendor_id = v.id
+        JOIN meal_types mt ON t.meal_type_id = mt.id
+        ORDER BY t.transaction_date DESC, t.transaction_time DESC
+      `);
+
+      const eventConsumptions = await dbAll(`
+        SELECT 
+          ec.id,
+          DATE(ec.consumed_at) as transaction_date,
+          TO_CHAR(ec.consumed_at, 'HH24:MI:SS') as transaction_time,
+          u.name as user_name,
+          u.registration_number,
+          COALESCE(v.name, 'N/A') as vendor_name,
+          mt.id as meal_type_id,
+          mt.name as meal_name,
+          e.name as event_name,
+          'event' as mode
+        FROM event_consumptions ec
+        JOIN users u ON ec.user_id = u.id
+        JOIN meal_types mt ON ec.meal_type_id = mt.id
+        JOIN events e ON ec.event_id = e.id
+        LEFT JOIN vendors v ON ec.vendor_id = v.id
+        ORDER BY ec.consumed_at DESC
+      `);
+
+      allTransactions = [...legacyTransactions, ...eventConsumptions];
+    }
 
     // Grouping by meal type
     const grouped = {};
@@ -1560,9 +1623,6 @@ app.get('/api/admin/consolidated-report', authenticateSession, async (req, res) 
         transactions: []
       };
     });
-
-    // Add an 'Other' group for transactions that might not match active meal types or if needed
-    // But currently meal_type_id is mandatory in both tables.
 
     allTransactions.forEach(tx => {
       if (grouped[tx.meal_type_id]) {
@@ -1575,6 +1635,8 @@ app.get('/api/admin/consolidated-report', authenticateSession, async (req, res) 
       mealTypes,
       grouped,
       totalCount: allTransactions.length,
+      events,
+      selectedEvent,
       timestamp: new Date().toISOString()
     });
   } catch (err) {
@@ -1692,36 +1754,57 @@ app.get('/api/admin/stats/daily-matrix', authenticateSession, async (req, res) =
       return res.status(403).json({ error: 'Not an admin session' });
     }
 
-    const { startDate, endDate } = req.query;
+    const { startDate, endDate, eventId } = req.query;
     const defaultStart = new Date();
     defaultStart.setDate(defaultStart.getDate() - 30);
     const defaultEnd = new Date().toISOString().split('T')[0];
 
     const start = (startDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate)) ? startDate : defaultStart.toISOString().split('T')[0];
     const end = (endDate && /^\d{4}-\d{2}-\d{2}$/.test(endDate)) ? endDate : defaultEnd;
+    const eventFilter = eventId ? sanitizeAlphanumeric(eventId, 50) : null;
 
     // Get all active meal types to use as columns
     const mealTypes = await dbAll('SELECT id, name FROM meal_types WHERE active = 1 ORDER BY start_time');
 
-    // Get combined stats
-    const stats = await dbAll(`
-      SELECT date, meal_type_id, SUM(count) as total_count
-      FROM (
-        SELECT transaction_date as date, meal_type_id, COUNT(*) as count
-        FROM transactions
-        WHERE transaction_date >= ? AND transaction_date <= ?
-        GROUP BY transaction_date, meal_type_id
-        
-        UNION ALL
-        
-        SELECT DATE(consumed_at)::text as date, meal_type_id, COUNT(*) as count
+    // Get available events (for filter dropdown)
+    const events = await dbAll(
+      'SELECT id, name, start_date, end_date FROM events WHERE active = 1 ORDER BY start_date DESC'
+    );
+
+    let selectedEvent = null;
+    let stats;
+
+    if (eventFilter) {
+      selectedEvent = await dbGet('SELECT id, name FROM events WHERE id = ?', [eventFilter]);
+      // When filtering by event, only event_consumptions have an event_id
+      stats = await dbAll(`
+        SELECT DATE(consumed_at)::text as date, meal_type_id, COUNT(*) as total_count
         FROM event_consumptions
-        WHERE DATE(consumed_at) >= ? AND DATE(consumed_at) <= ?
+        WHERE event_id = ? AND DATE(consumed_at) >= ? AND DATE(consumed_at) <= ?
         GROUP BY DATE(consumed_at), meal_type_id
-      )
-      GROUP BY date, meal_type_id
-      ORDER BY date DESC
-    `, [start, end, start, end]);
+        ORDER BY date DESC
+      `, [eventFilter, start, end]);
+    } else {
+      // No filter: combine legacy + event consumptions
+      stats = await dbAll(`
+        SELECT date, meal_type_id, SUM(count) as total_count
+        FROM (
+          SELECT transaction_date as date, meal_type_id, COUNT(*) as count
+          FROM transactions
+          WHERE transaction_date >= ? AND transaction_date <= ?
+          GROUP BY transaction_date, meal_type_id
+          
+          UNION ALL
+          
+          SELECT DATE(consumed_at)::text as date, meal_type_id, COUNT(*) as count
+          FROM event_consumptions
+          WHERE DATE(consumed_at) >= ? AND DATE(consumed_at) <= ?
+          GROUP BY DATE(consumed_at), meal_type_id
+        )
+        GROUP BY date, meal_type_id
+        ORDER BY date DESC
+      `, [start, end, start, end]);
+    }
 
     // Pivot the data
     const matrix = {};
@@ -1741,6 +1824,8 @@ app.get('/api/admin/stats/daily-matrix', authenticateSession, async (req, res) =
       endDate: end,
       mealTypes,
       rows,
+      events,
+      selectedEvent,
       summary: {
         totalMeals: rows.reduce((sum, r) => sum + r.dailyTotal, 0),
         totalDays: rows.length
@@ -3390,7 +3475,10 @@ app.post('/api/admin/users/bulk-import', authenticateSession, async (req, res) =
                ON CONFLICT (registration_number) DO NOTHING`,
               [userId, u.registrationNumber, u.name, u.pinHash, u.accommodation || 'Y']
             );
-            if (!result || result.changes === 0) { skipped++; continue; }
+            if (!result || result.changes === 0) {
+              // User already exists (likely inserted in the batch above) - don't double-count
+              continue;
+            }
 
             existingRegNums.add(u.registrationNumber);
             imported++;
@@ -3398,12 +3486,17 @@ app.post('/api/admin/users/bulk-import', authenticateSession, async (req, res) =
             if (createAllocations && mealTypes.length > 0) {
               const mealAllocation = (u.accommodation === 'N') ? 4 : 12;
               for (const mt of mealTypes) {
-                await dbRun(
-                  `INSERT INTO meal_allocations (id, user_id, meal_type_id, allocated, remaining)
-                   VALUES (?, ?, ?, ?, ?)
-                   ON CONFLICT (user_id, meal_type_id) DO NOTHING`,
-                  [generateId(), userId, mt.id, mealAllocation, mealAllocation]
-                );
+                try {
+                  await dbRun(
+                    `INSERT INTO meal_allocations (id, user_id, meal_type_id, allocated, remaining)
+                     VALUES (?, ?, ?, ?, ?)
+                     ON CONFLICT (user_id, meal_type_id) DO NOTHING`,
+                    [generateId(), userId, mt.id, mealAllocation, mealAllocation]
+                  );
+                } catch (allocErr) {
+                  // Log but don't fail the user import over meal allocation issues
+                  importErrors.push({ user: u.registrationNumber, error: 'Meal allocation: ' + allocErr.message });
+                }
               }
             }
           } catch (err2) {

@@ -49,7 +49,8 @@ CREATE TABLE IF NOT EXISTS meal_allocations (
   consumed_count INTEGER DEFAULT 0,
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   FOREIGN KEY (user_id) REFERENCES users(id),
-  FOREIGN KEY (meal_type_id) REFERENCES meal_types(id)
+  FOREIGN KEY (meal_type_id) REFERENCES meal_types(id),
+  UNIQUE(user_id, meal_type_id)
 );
 
 -- Sessions

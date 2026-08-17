@@ -57,12 +57,16 @@ async function importUsers() {
         const mealTypes = await dbAll('SELECT id FROM meal_types WHERE active = 1');
         for (const mt of mealTypes) {
           const allocId = generateId();
-          await dbRun(
-            `INSERT INTO meal_allocations (id, user_id, meal_type_id, allocated, remaining)
-             VALUES (?, ?, ?, 12, 12)
-             ON CONFLICT (user_id, meal_type_id) DO NOTHING`,
-            [allocId, id, mt.id]
-          );
+          try {
+            await dbRun(
+              `INSERT INTO meal_allocations (id, user_id, meal_type_id, allocated, remaining)
+               VALUES (?, ?, ?, 12, 12)
+               ON CONFLICT (user_id, meal_type_id) DO NOTHING`,
+              [allocId, id, mt.id]
+            );
+          } catch (allocErr) {
+            console.error(`  ⚠ Meal allocation failed for ${registrationNumber}/${mt.id}: ${allocErr.message}`);
+          }
         }
 
         console.log(`✓ Added: ${name} (${registrationNumber})`);
