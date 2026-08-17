@@ -56,7 +56,7 @@ db.serialize(async () => {
             for (const user of users) {
                 for (const mt of mealTypes) {
                     await new Promise((resolve) => {
-                        db.run(`INSERT OR IGNORE INTO meal_allocations (id, user_id, meal_type_id, allocated, remaining) VALUES (?, ?, ?, 10, 10)`,
+                        db.run(`INSERT OR IGNORE INTO meal_allocations (id, user_id, meal_type_id, allocated, remaining) VALUES (?, ?, ?, 12, 12)`,
                             [generateId(), user.id, mt.id], function (err) {
                                 if (!err && this.changes > 0) addedAlloc++;
                                 resolve();
@@ -66,9 +66,9 @@ db.serialize(async () => {
             }
             console.log(`  - Added ${addedAlloc} missing meal allocations.`);
 
-            // 2. Set ALL allocations to 10 (as requested for "maximum redemptions")
-            db.run(`UPDATE meal_allocations SET allocated = 10, remaining = 10, updated_at = datetime('now')`, function (err) {
-                console.log(`  - Set all ${this.changes} allocation records to 10/10.`);
+            // 2. Set ALL allocations to 12 (as requested for "maximum redemptions")
+            db.run(`UPDATE meal_allocations SET allocated = 12, remaining = 12, updated_at = datetime('now')`, function (err) {
+                console.log(`  - Set all ${this.changes} allocation records to 12/12.`);
             });
 
             // 3. Register everyone for current events
@@ -105,7 +105,7 @@ db.serialize(async () => {
                 }
 
                 console.log('\n✅ System optimized for Maximum Redemptions.');
-                console.log('   Users now have 10 legacy meals per type and are registered for all events.');
+                console.log('   Users now have 12 legacy meals per type and are registered for all events.');
                 db.close();
             });
         });

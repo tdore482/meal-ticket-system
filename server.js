@@ -843,7 +843,7 @@ async function handleEventValidation(req, res, { eventId, regNum, tokenStr, meal
     `SELECT meal_type_id FROM event_consumptions WHERE event_id = ? AND user_id = ?`,
     [eventId, user.id]
   );
-  const remainingCount = 10 - consumptions.length;
+  const remainingCount = mealLimit - consumptions.length;
 
   res.json({
     status: 'approved',
@@ -884,7 +884,7 @@ app.post('/api/admin/fix-database', authenticateSession, async (req, res) => {
     `);
     await dbRun(`INSERT INTO event_consumptions SELECT * FROM event_consumptions_backup`);
     await dbRun(`DROP TABLE IF EXISTS event_consumptions_backup`);
-    await dbRun(`UPDATE meal_allocations SET allocated = 10, remaining = 10`);
+    await dbRun(`UPDATE meal_allocations SET allocated = 12, remaining = 12`);
     console.log('✅ Manual repair complete.');
 
     res.json({ success: true, message: 'Database constraint removed. Multi-day meals now allowed.' });
