@@ -105,6 +105,13 @@ function getCurrentTimeInSeconds() {
   return (get('hour') * 3600) + (get('minute') * 60) + get('second');
 }
 
+// Returns today's date as 'YYYY-MM-DD' in the application timezone (Africa/Harare).
+// This MUST be used instead of CURRENT_DATE in SQL to avoid timezone mismatches
+// when the PostgreSQL session timezone differs from the app timezone.
+function getAppToday() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: APP_TIMEZONE });
+}
+
 function isTimeInRange(currentSeconds, startTime, endTime) {
   const startSeconds = timeStringToSeconds(startTime);
   const endSeconds = timeStringToSeconds(endTime);
@@ -501,7 +508,7 @@ app.get('/api/vendor/dashboard', authenticateSession, async (req, res) => {
     const activeMeal = findActiveMeal(mealTypes) || null;
 
     // Get consumption stats for each meal type (today)
-    const today = new Date().toISOString().split('T')[0];
+    const today = getAppToday();
     const mealStats = await Promise.all(mealTypes.map(async (meal) => {
       // Legacy Stats
       const legacyStats = await dbGet(`
@@ -657,6 +664,7 @@ app.post('/api/vendor/validate-qr', authenticateSession, async (req, res) => {
 
     const newRemaining = allocation.remaining - 1;
     const txId = generateId();
+    const appToday = getAppToday();
 
     try {
       const client = await getClient();
@@ -664,11 +672,11 @@ app.post('/api/vendor/validate-qr', authenticateSession, async (req, res) => {
         await client.query('BEGIN');
 
         // Duplicate check INSIDE transaction to prevent race conditions.
-        // Uses CURRENT_DATE (server timezone) to match how transaction_date is stored.
+        // Uses app timezone date to stay consistent with findActiveMeal().
         const dupCheck = await client.query(
           `SELECT id FROM transactions
-           WHERE user_id = $1 AND meal_type_id = $2 AND transaction_date = CURRENT_DATE`,
-          [user.id, activeMeal.id]
+           WHERE user_id = $1 AND meal_type_id = $2 AND transaction_date = $3`,
+          [user.id, activeMeal.id, appToday]
         );
         if (dupCheck.rowCount > 0) {
           await client.query('ROLLBACK');
@@ -690,8 +698,8 @@ app.post('/api/vendor/validate-qr', authenticateSession, async (req, res) => {
         await client.query(
           `INSERT INTO transactions (id, user_id, vendor_id, meal_type_id, qr_token_id,
            meal_remaining_after, transaction_date, transaction_time)
-           VALUES ($1, $2, $3, $4, $5, $6, CURRENT_DATE, NOW())`,
-          [txId, user.id, req.session.vendor_id, activeMeal.id, qrToken.id, newRemaining]
+           VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
+          [txId, user.id, req.session.vendor_id, activeMeal.id, qrToken.id, newRemaining, appToday]
         );
         await client.query('COMMIT');
       } catch (txErr) {
@@ -730,7 +738,7 @@ async function handleEventValidation(req, res, { eventId, regNum, tokenStr, meal
     return res.status(400).json({ status: 'denied', message: 'Event Not Found or Inactive' });
   }
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = getAppToday();
   if (today < event.start_date || today > event.end_date) {
     return res.status(400).json({ status: 'denied', message: 'Event Not Active for This Date' });
   }
@@ -794,6 +802,7 @@ async function handleEventValidation(req, res, { eventId, regNum, tokenStr, meal
 
   // Check if user already redeemed this meal type today — INSIDE a transaction to prevent race conditions
   const consumptionId = generateId();
+  const appToday = getAppToday();
   try {
     const client = await getClient();
     try {
@@ -802,8 +811,8 @@ async function handleEventValidation(req, res, { eventId, regNum, tokenStr, meal
       const dupCheck = await client.query(
         `SELECT id FROM event_consumptions
          WHERE event_id = $1 AND user_id = $2 AND meal_type_id = $3
-         AND consumed_at::date = CURRENT_DATE`,
-        [eventId, user.id, mealType.id]
+         AND DATE(consumed_at AT TIME ZONE $4) = $5`,
+        [eventId, user.id, mealType.id, APP_TIMEZONE, appToday]
       );
       if (dupCheck.rowCount > 0) {
         await client.query('ROLLBACK');
@@ -896,7 +905,7 @@ app.get('/api/admin/dashboard', authenticateSession, async (req, res) => {
       return res.status(403).json({ error: 'Not an admin session' });
     }
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = getAppToday();
     const { offset = '0', limit = '20', mealTypeId, vendorId, dateFilter } = req.query;
     const offsetNum = Math.max(0, parseInt(offset) || 0);
     const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
@@ -1146,7 +1155,7 @@ app.get('/api/admin/daily-summary', authenticateSession, async (req, res) => {
       return res.status(403).json({ error: 'Not an admin session' });
     }
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = getAppToday();
     const { date = today, eventId, userId, mealTypeId, offset = '0', limit = '50' } = req.query;
     const offsetNum = Math.max(0, parseInt(offset) || 0);
     const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 50));
