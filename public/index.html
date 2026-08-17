@@ -998,6 +998,10 @@
         if (qrData.startsWith('EVT:') && selectedMealTypeId) {
           body.mealTypeId = selectedMealTypeId;
         }
+
+        // Stop camera immediately after a scan to prevent rapid re-scans
+        stopScanner();
+
         const result = await apiCall('/vendor/validate-qr', 'POST', body);
         showScanResult(result.status, result.message, result.remaining);
       } catch (err) {
@@ -1031,15 +1035,10 @@
         </div>
         <p style="font-size:14px; font-weight:500; margin-top:6px;">${message}</p>
         ${remaining !== undefined ? `<p style="margin-top:6px; font-size:13px;">Meals Remaining: <strong>${remaining}</strong></p>` : ''}
+        <p style="margin-top:10px; font-size:12px; color:var(--muted);">Camera stopped. Click <strong>Open Camera</strong> to scan the next student.</p>
       `;
 
       resultDiv.classList.remove('hidden');
-
-      if (status === 'approved') {
-        setTimeout(() => {
-          resultDiv.classList.add('hidden');
-        }, 3000);
-      }
     }
 
     // Admin Navigation
