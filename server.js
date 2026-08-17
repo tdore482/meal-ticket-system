@@ -1676,45 +1676,71 @@ app.get('/api/admin/stats/meals-per-day', authenticateSession, async (req, res) 
       return res.status(403).json({ error: 'Not an admin session' });
     }
 
-    const { startDate, endDate } = req.query;
+    const { startDate, endDate, eventId } = req.query;
     const defaultStart = new Date();
     defaultStart.setDate(defaultStart.getDate() - 30);
     const defaultEnd = new Date().toISOString().split('T')[0];
 
     const start = (startDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate)) ? startDate : defaultStart.toISOString().split('T')[0];
     const end = (endDate && /^\d{4}-\d{2}-\d{2}$/.test(endDate)) ? endDate : defaultEnd;
+    const eventFilter = eventId ? sanitizeAlphanumeric(eventId, 50) : null;
 
-    // Legacy transactions
-    const legacyStats = await dbAll(
-      `SELECT 
-        t.transaction_date as date,
-        mt.name as meal_type,
-        mt.id as meal_type_id,
-        COUNT(t.id) as count,
-        'legacy' as mode
-       FROM transactions t
-       JOIN meal_types mt ON t.meal_type_id = mt.id
-       WHERE t.transaction_date >= ? AND t.transaction_date <= ?
-       GROUP BY t.transaction_date, mt.id, mt.name
-       ORDER BY t.transaction_date DESC, mt.start_time`,
-      [start, end]
+    // Get available events for filter dropdown
+    const events = await dbAll(
+      'SELECT id, name, start_date, end_date FROM events WHERE active = 1 ORDER BY start_date DESC'
     );
 
-    // Event consumptions
-    const eventStats = await dbAll(
-      `SELECT 
-        DATE(ec.consumed_at)::text as date,
-        mt.name as meal_type,
-        mt.id as meal_type_id,
-        COUNT(ec.id) as count,
-        'event' as mode
-       FROM event_consumptions ec
-       JOIN meal_types mt ON ec.meal_type_id = mt.id
-       WHERE DATE(ec.consumed_at) >= ? AND DATE(ec.consumed_at) <= ?
-       GROUP BY DATE(ec.consumed_at), mt.id, mt.name
-       ORDER BY date DESC, mt.start_time`,
-      [start, end]
-    );
+    let legacyStats = [];
+    let eventStats = [];
+    let selectedEvent = null;
+
+    if (eventFilter) {
+      selectedEvent = await dbGet('SELECT id, name FROM events WHERE id = ?', [eventFilter]);
+      eventStats = await dbAll(
+        `SELECT 
+          DATE(ec.consumed_at)::text as date,
+          mt.name as meal_type,
+          mt.id as meal_type_id,
+          COUNT(ec.id) as count,
+          'event' as mode
+         FROM event_consumptions ec
+         JOIN meal_types mt ON ec.meal_type_id = mt.id
+         WHERE ec.event_id = ? AND DATE(ec.consumed_at) >= ? AND DATE(ec.consumed_at) <= ?
+         GROUP BY DATE(ec.consumed_at), mt.id, mt.name
+         ORDER BY date DESC, mt.start_time`,
+        [eventFilter, start, end]
+      );
+    } else {
+      legacyStats = await dbAll(
+        `SELECT 
+          t.transaction_date as date,
+          mt.name as meal_type,
+          mt.id as meal_type_id,
+          COUNT(t.id) as count,
+          'legacy' as mode
+         FROM transactions t
+         JOIN meal_types mt ON t.meal_type_id = mt.id
+         WHERE t.transaction_date >= ? AND t.transaction_date <= ?
+         GROUP BY t.transaction_date, mt.id, mt.name
+         ORDER BY t.transaction_date DESC, mt.start_time`,
+        [start, end]
+      );
+
+      eventStats = await dbAll(
+        `SELECT 
+          DATE(ec.consumed_at)::text as date,
+          mt.name as meal_type,
+          mt.id as meal_type_id,
+          COUNT(ec.id) as count,
+          'event' as mode
+         FROM event_consumptions ec
+         JOIN meal_types mt ON ec.meal_type_id = mt.id
+         WHERE DATE(ec.consumed_at) >= ? AND DATE(ec.consumed_at) <= ?
+         GROUP BY DATE(ec.consumed_at), mt.id, mt.name
+         ORDER BY date DESC, mt.start_time`,
+        [start, end]
+      );
+    }
 
     // Combine and deduplicate by date and meal type
     const combinedMap = new Map();
@@ -1752,6 +1778,8 @@ app.get('/api/admin/stats/meals-per-day', authenticateSession, async (req, res) 
       endDate: end,
       mealsPerDay: stats,
       dailyTotals,
+      events,
+      selectedEvent,
       summary: {
         totalMeals: dailyTotals.reduce((sum, d) => sum + d.total, 0),
         totalDays: dailyTotals.length,
@@ -1868,42 +1896,68 @@ app.get('/api/admin/stats/meals-per-time', authenticateSession, async (req, res)
       return res.status(403).json({ error: 'Not an admin session' });
     }
 
-    const { date } = req.query;
+    const { date, eventId } = req.query;
     const targetDate = (date && /^\d{4}-\d{2}-\d{2}$/.test(date))
       ? date
       : new Date().toISOString().split('T')[0];
+    const eventFilter = eventId ? sanitizeAlphanumeric(eventId, 50) : null;
 
-    // Legacy transactions
-    const legacyStats = await dbAll(
-      `SELECT 
-        EXTRACT(HOUR FROM t.transaction_time)::text as hour,
-        mt.name as meal_type,
-        mt.id as meal_type_id,
-        COUNT(t.id) as count,
-        'legacy' as mode
-       FROM transactions t
-       JOIN meal_types mt ON t.meal_type_id = mt.id
-       WHERE t.transaction_date = ?
-       GROUP BY hour, mt.id, mt.name
-       ORDER BY hour, mt.start_time`,
-      [targetDate]
+    // Get available events for filter dropdown
+    const events = await dbAll(
+      'SELECT id, name, start_date, end_date FROM events WHERE active = 1 ORDER BY start_date DESC'
     );
 
-    // Event consumptions
-    const eventStats = await dbAll(
-      `SELECT 
-        EXTRACT(HOUR FROM ec.consumed_at)::text as hour,
-        mt.name as meal_type,
-        mt.id as meal_type_id,
-        COUNT(ec.id) as count,
-        'event' as mode
-       FROM event_consumptions ec
-       JOIN meal_types mt ON ec.meal_type_id = mt.id
-       WHERE DATE(ec.consumed_at) = ?
-       GROUP BY hour, mt.id, mt.name
-       ORDER BY hour, mt.start_time`,
-      [targetDate]
-    );
+    let legacyStats = [];
+    let eventStats = [];
+    let selectedEvent = null;
+
+    if (eventFilter) {
+      selectedEvent = await dbGet('SELECT id, name FROM events WHERE id = ?', [eventFilter]);
+      eventStats = await dbAll(
+        `SELECT 
+          EXTRACT(HOUR FROM ec.consumed_at)::text as hour,
+          mt.name as meal_type,
+          mt.id as meal_type_id,
+          COUNT(ec.id) as count,
+          'event' as mode
+         FROM event_consumptions ec
+         JOIN meal_types mt ON ec.meal_type_id = mt.id
+         WHERE ec.event_id = ? AND DATE(ec.consumed_at) = ?
+         GROUP BY hour, mt.id, mt.name
+         ORDER BY hour, mt.start_time`,
+        [eventFilter, targetDate]
+      );
+    } else {
+      legacyStats = await dbAll(
+        `SELECT 
+          EXTRACT(HOUR FROM t.transaction_time)::text as hour,
+          mt.name as meal_type,
+          mt.id as meal_type_id,
+          COUNT(t.id) as count,
+          'legacy' as mode
+         FROM transactions t
+         JOIN meal_types mt ON t.meal_type_id = mt.id
+         WHERE t.transaction_date = ?
+         GROUP BY hour, mt.id, mt.name
+         ORDER BY hour, mt.start_time`,
+        [targetDate]
+      );
+
+      eventStats = await dbAll(
+        `SELECT 
+          EXTRACT(HOUR FROM ec.consumed_at)::text as hour,
+          mt.name as meal_type,
+          mt.id as meal_type_id,
+          COUNT(ec.id) as count,
+          'event' as mode
+         FROM event_consumptions ec
+         JOIN meal_types mt ON ec.meal_type_id = mt.id
+         WHERE DATE(ec.consumed_at) = ?
+         GROUP BY hour, mt.id, mt.name
+         ORDER BY hour, mt.start_time`,
+        [targetDate]
+      );
+    }
 
     // Combine stats
     const combinedMap = new Map();
@@ -1944,6 +1998,8 @@ app.get('/api/admin/stats/meals-per-time', authenticateSession, async (req, res)
       stats,
       hourlyTotals,
       peakHour,
+      events,
+      selectedEvent,
       summary: {
         totalMeals: hourlyTotals.reduce((sum, h) => sum + h.count, 0),
         legacyMeals: legacyStats.reduce((sum, s) => sum + s.count, 0),

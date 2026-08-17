@@ -491,6 +491,9 @@
                   <div style="flex:1; min-width:280px;">
                     <h4 style="margin-bottom:10px; font-size:13px; text-transform:uppercase; color:var(--muted); font-weight:600;">Meals Per Day</h4>
                     <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
+                      <select class="form-input" id="mealsPerDayEventFilter" style="min-width:140px; font-size:12px;">
+                        <option value="">All Events</option>
+                      </select>
                       <input type="date" class="form-input" id="reportStartDate" style="flex:1;">
                       <input type="date" class="form-input" id="reportEndDate" style="flex:1;">
                       <button class="btn btn-accent" onclick="loadMealsPerDay()">Load</button>
@@ -502,7 +505,10 @@
 
                   <div style="flex:1; min-width:280px;">
                     <h4 style="margin-bottom:10px; font-size:13px; text-transform:uppercase; color:var(--muted); font-weight:600;">Meals Per Time (Hourly)</h4>
-                    <div style="display:flex; gap:8px; margin-bottom:12px;">
+                    <div style="display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap;">
+                      <select class="form-input" id="mealsPerTimeEventFilter" style="min-width:140px; font-size:12px;">
+                        <option value="">All Events</option>
+                      </select>
                       <input type="date" class="form-input" id="reportTimeDate" style="flex:1;">
                       <button class="btn btn-accent" onclick="loadMealsPerTime()">Load</button>
                     </div>
@@ -1884,6 +1890,7 @@
     async function loadMealsPerDay() {
       let startDate = document.getElementById('reportStartDate').value;
       let endDate = document.getElementById('reportEndDate').value;
+      const eventId = document.getElementById('mealsPerDayEventFilter').value;
 
       if (!startDate || !endDate) {
         const today = new Date();
@@ -1899,15 +1906,31 @@
 
       try {
         container.innerHTML = '<p style="color:var(--muted);">Loading...</p>';
-        const data = await apiCall(`/admin/stats/meals-per-day?startDate=${startDate}&endDate=${endDate}`);
+        let url = `/admin/stats/meals-per-day?startDate=${startDate}&endDate=${endDate}`;
+        if (eventId) url += `&eventId=${encodeURIComponent(eventId)}`;
+        const data = await apiCall(url);
+
+        // Populate event dropdown (only once)
+        const eventSelect = document.getElementById('mealsPerDayEventFilter');
+        if (eventSelect && data.events && eventSelect.options.length <= 1) {
+          data.events.forEach(e => {
+            const opt = document.createElement('option');
+            opt.value = e.id;
+            opt.textContent = `${e.name}`;
+            eventSelect.appendChild(opt);
+          });
+        }
+        if (eventSelect && eventId) eventSelect.value = eventId;
+
+        const eventLabel = data.selectedEvent ? ` — ${data.selectedEvent.name}` : '';
 
         if (!data.mealsPerDay || data.mealsPerDay.length === 0) {
-          container.innerHTML = '<p style="color:var(--muted);">No meals served in this period.</p>';
+          container.innerHTML = `<p style="color:var(--muted);">No meals served in this period${eventLabel}.</p>`;
           return;
         }
 
         let html = `<div style="margin-bottom:12px; padding:10px; background:var(--surface); border:1px solid var(--border); border-radius:6px; font-size:12px;">
-          <strong>Total:</strong> ${data.summary.totalMeals} meals over ${data.summary.totalDays} days
+          <strong>Total:</strong> ${data.summary.totalMeals} meals over ${data.summary.totalDays} days${eventLabel}
         </div>`;
 
         const byDate = {};
@@ -1934,6 +1957,7 @@
 
     async function loadMealsPerTime() {
       let date = document.getElementById('reportTimeDate').value;
+      const eventId = document.getElementById('mealsPerTimeEventFilter').value;
       const container = document.getElementById('mealsPerTimeResults');
 
       if (!date) {
@@ -1943,10 +1967,26 @@
 
       try {
         container.innerHTML = '<p style="color:var(--muted);">Loading...</p>';
-        const data = await apiCall(`/admin/stats/meals-per-time?date=${date}`);
+        let url = `/admin/stats/meals-per-time?date=${date}`;
+        if (eventId) url += `&eventId=${encodeURIComponent(eventId)}`;
+        const data = await apiCall(url);
+
+        // Populate event dropdown (only once)
+        const eventSelect = document.getElementById('mealsPerTimeEventFilter');
+        if (eventSelect && data.events && eventSelect.options.length <= 1) {
+          data.events.forEach(e => {
+            const opt = document.createElement('option');
+            opt.value = e.id;
+            opt.textContent = `${e.name}`;
+            eventSelect.appendChild(opt);
+          });
+        }
+        if (eventSelect && eventId) eventSelect.value = eventId;
+
+        const eventLabel = data.selectedEvent ? ` — ${data.selectedEvent.name}` : '';
 
         if (!data.hourlyTotals || data.hourlyTotals.length === 0) {
-          container.innerHTML = '<p style="color:var(--muted);">No meals served on this date.</p>';
+          container.innerHTML = `<p style="color:var(--muted);">No meals served on this date${eventLabel}.</p>`;
           return;
         }
 
