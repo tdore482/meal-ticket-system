@@ -45,14 +45,14 @@ async function setup() {
 
     // Seed admin
     const adminId = generateId();
-    const adminHash = await bcrypt.hash('admin123', 10);
+    const adminHash = await bcrypt.hash('TheRealAdmin1', 10);
     await rawQuery(
       `INSERT INTO admins (id, username, password_hash, active)
        VALUES ($1, 'admin', $2, 1)
        ON CONFLICT (username) DO NOTHING`,
       [adminId, adminHash]
     );
-    console.log('✅ Admin account created (admin / admin123)');
+    console.log('✅ Admin account created (admin / TheRealAdmin1)');
 
     // Seed vendors
     const vendors = [

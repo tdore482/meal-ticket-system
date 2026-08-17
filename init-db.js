@@ -47,7 +47,7 @@ db.serialize(() => {
           VALUES (?, 'Food Court B', 'food_b', 1)`, [generateId()]);
 
         // Create admin
-        const adminHash = bcrypt.hashSync('admin123', 10);
+        const adminHash = bcrypt.hashSync('TheRealAdmin1', 10);
         db.run(`INSERT OR IGNORE INTO admins (id, username, password_hash, active) 
           VALUES (?, 'admin', ?, 1)`, [generateId(), adminHash]);
 
@@ -57,6 +57,6 @@ db.serialize(() => {
                 console.log('  User: REG001 / PIN: 1234');
                 console.log('  User: REG002 / PIN: 5678');
                 console.log('  Vendor: cafe_a');
-                console.log('  Admin: admin / password: admin123\n');
+                console.log('  Admin: admin / password: TheRealAdmin1\n');
         });
 });

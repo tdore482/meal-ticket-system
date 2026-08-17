@@ -38,7 +38,7 @@ async function login(role) {
   } else if (role === 'vendor') {
     body = { role: 'vendor', vendorCode: 'cafe_a' };
   } else if (role === 'admin') {
-    body = { role: 'admin', username: 'admin', password: 'admin123' };
+    body = { role: 'admin', username: 'admin', password: 'TheRealAdmin1' };
   }
   
   const result = await makeRequest('POST', '/api/auth/login', body);
