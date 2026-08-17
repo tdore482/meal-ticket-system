@@ -655,40 +655,43 @@ app.post('/api/vendor/validate-qr', authenticateSession, async (req, res) => {
       });
     }
 
-    // Check if user already redeemed this meal type today
-    const todayDate = new Date().toISOString().split('T')[0];
-    const existingTodayTx = await dbGet(
-      `SELECT id FROM transactions
-       WHERE user_id = ? AND meal_type_id = ? AND transaction_date = ?`,
-      [user.id, activeMeal.id, todayDate]
-    );
-    if (existingTodayTx) {
-      const mealType = await dbGet(
-        'SELECT name FROM meal_types WHERE id = ?',
-        [activeMeal.id]
-      );
-      return res.status(400).json({
-        status: 'denied',
-        message: `Already redeemed ${mealType.name} today`
-      });
-    }
-
     const newRemaining = allocation.remaining - 1;
     const txId = generateId();
-    const txDate = new Date().toISOString().split('T')[0];
 
     try {
       const client = await getClient();
       try {
         await client.query('BEGIN');
+
+        // Duplicate check INSIDE transaction to prevent race conditions.
+        // Uses CURRENT_DATE (server timezone) to match how transaction_date is stored.
+        const dupCheck = await client.query(
+          `SELECT id FROM transactions
+           WHERE user_id = $1 AND meal_type_id = $2 AND transaction_date = CURRENT_DATE`,
+          [user.id, activeMeal.id]
+        );
+        if (dupCheck.rowCount > 0) {
+          await client.query('ROLLBACK');
+          const mealType = await dbGet(
+            'SELECT name FROM meal_types WHERE id = ?',
+            [activeMeal.id]
+          );
+          return res.status(400).json({
+            status: 'denied',
+            message: `Already redeemed ${mealType.name} today`
+          });
+        }
+
         await client.query('UPDATE qr_tokens SET used = 1 WHERE id = $1', [qrToken.id]);
         await client.query(
           'UPDATE meal_allocations SET remaining = $1, updated_at = NOW() WHERE id = $2',
           [newRemaining, allocation.id]
         );
         await client.query(
-          'INSERT INTO transactions (id, user_id, vendor_id, meal_type_id, qr_token_id, meal_remaining_after, transaction_date, transaction_time) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())',
-          [txId, user.id, req.session.vendor_id, activeMeal.id, qrToken.id, newRemaining, txDate]
+          `INSERT INTO transactions (id, user_id, vendor_id, meal_type_id, qr_token_id,
+           meal_remaining_after, transaction_date, transaction_time)
+           VALUES ($1, $2, $3, $4, $5, $6, CURRENT_DATE, NOW())`,
+          [txId, user.id, req.session.vendor_id, activeMeal.id, qrToken.id, newRemaining]
         );
         await client.query('COMMIT');
       } catch (txErr) {
@@ -789,25 +792,43 @@ async function handleEventValidation(req, res, { eventId, regNum, tokenStr, meal
     return res.status(400).json({ status: 'denied', message: 'No active meal types configured' });
   }
 
-  // Check if user already redeemed this meal type today
-  const todayConsumed = await dbGet(
-    `SELECT id FROM event_consumptions
-     WHERE event_id = ? AND user_id = ? AND meal_type_id = ? AND consumed_at::date = CURRENT_DATE`,
-    [eventId, user.id, mealType.id]
-  );
-  if (todayConsumed) {
-    return res.status(400).json({
-      status: 'denied',
-      message: `Already redeemed ${mealType.name} today`
-    });
-  }
-
+  // Check if user already redeemed this meal type today — INSIDE a transaction to prevent race conditions
   const consumptionId = generateId();
-  await dbRun(
-    `INSERT INTO event_consumptions (id, event_id, user_id, meal_type_id, vendor_id)
-     VALUES (?, ?, ?, ?, ?)`,
-    [consumptionId, eventId, user.id, mealType.id, req.session.vendor_id]
-  );
+  try {
+    const client = await getClient();
+    try {
+      await client.query('BEGIN');
+
+      const dupCheck = await client.query(
+        `SELECT id FROM event_consumptions
+         WHERE event_id = $1 AND user_id = $2 AND meal_type_id = $3
+         AND consumed_at::date = CURRENT_DATE`,
+        [eventId, user.id, mealType.id]
+      );
+      if (dupCheck.rowCount > 0) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({
+          status: 'denied',
+          message: `Already redeemed ${mealType.name} today`
+        });
+      }
+
+      await client.query(
+        `INSERT INTO event_consumptions (id, event_id, user_id, meal_type_id, vendor_id)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [consumptionId, eventId, user.id, mealType.id, req.session.vendor_id]
+      );
+      await client.query('COMMIT');
+    } catch (txErr) {
+      await client.query('ROLLBACK');
+      throw txErr;
+    } finally {
+      client.release();
+    }
+  } catch (txErr) {
+    console.error('Event consumption transaction error:', txErr);
+    return res.status(500).json({ status: 'denied', message: 'Transaction failed: ' + txErr.message });
+  }
 
   const consumptions = await dbAll(
     `SELECT meal_type_id FROM event_consumptions WHERE event_id = ? AND user_id = ?`,
