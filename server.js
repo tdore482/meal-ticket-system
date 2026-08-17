@@ -1871,8 +1871,9 @@ app.get('/api/admin/stats/daily-matrix', authenticateSession, async (req, res) =
         matrix[s.date] = { date: s.date, totals: {}, dailyTotal: 0 };
         mealTypes.forEach(mt => matrix[s.date].totals[mt.id] = 0);
       }
-      matrix[s.date].totals[s.meal_type_id] = s.total_count;
-      matrix[s.date].dailyTotal += s.total_count;
+      const count = Number(s.total_count) || 0;
+      matrix[s.date].totals[s.meal_type_id] = count;
+      matrix[s.date].dailyTotal += count;
     });
 
     const rows = Object.values(matrix).sort((a, b) => b.date.localeCompare(a.date));

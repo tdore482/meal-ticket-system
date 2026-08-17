@@ -2279,7 +2279,7 @@
 
         const eventLabel = selectedEvent ? ` — ${selectedEvent.name}` : '';
 
-        const computedTotal = mealTypes.reduce((grandSum, mt) => grandSum + rows.reduce((sum, r) => sum + (r.totals[mt.id] || 0), 0), 0);
+        const computedTotal = mealTypes.reduce((grandSum, mt) => grandSum + Number(rows.reduce((sum, r) => sum + (Number(r.totals[mt.id]) || 0), 0)), 0);
 
         let html = `
           <div style="margin-bottom:1rem; font-size:13px; color:var(--muted);">
@@ -2297,7 +2297,7 @@
         `;
 
         rows.forEach(row => {
-          const computedDailyTotal = mealTypes.reduce((sum, mt) => sum + (row.totals[mt.id] || 0), 0);
+          const computedDailyTotal = mealTypes.reduce((sum, mt) => sum + (Number(row.totals[mt.id]) || 0), 0);
           html += `
             <tr>
               <td style="font-weight: 600;">${row.date}</td>
@@ -2319,11 +2319,11 @@
               <tr style="background: #F3F4F6;">
                 <td style="font-weight: 700;">PERIOD TOTAL</td>
                 ${mealTypes.map(mt => {
-                  const colTotal = rows.reduce((sum, r) => sum + (r.totals[mt.id] || 0), 0);
+                  const colTotal = rows.reduce((sum, r) => sum + (Number(r.totals[mt.id]) || 0), 0);
                   return `<td style="text-align: center; font-weight: 700;">${colTotal}</td>`;
                 }).join('')}
                 <td style="text-align: center; font-weight: 800; background: var(--text); color: white;">
-                  ${mealTypes.reduce((grandSum, mt) => grandSum + rows.reduce((sum, r) => sum + (r.totals[mt.id] || 0), 0), 0)}
+                  ${mealTypes.reduce((grandSum, mt) => grandSum + Number(rows.reduce((sum, r) => sum + (Number(r.totals[mt.id]) || 0), 0)), 0)}
                 </td>
               </tr>
             </tfoot>
@@ -2425,7 +2425,7 @@
         let cols = `<td>${row.date}</td>`;
         let rowTotal = 0;
         data.mealTypes.forEach(mt => {
-          const val = row.totals[mt.id] || 0;
+          const val = Number(row.totals[mt.id]) || 0;
           cols += `<td style="text-align:center">${val}</td>`;
           rowTotal += val;
         });
@@ -2436,7 +2436,7 @@
 
       let footCols = `<td><strong>TOTALS</strong></td>`;
       data.mealTypes.forEach(mt => {
-        const colTotal = data.rows.reduce((sum, r) => sum + (r.totals[mt.id] || 0), 0);
+        const colTotal = data.rows.reduce((sum, r) => sum + (Number(r.totals[mt.id]) || 0), 0);
         footCols += `<td style="text-align:center"><strong>${colTotal}</strong></td>`;
       });
       footCols += `<td style="text-align:center"><strong>${grandTotal}</strong></td>`;
