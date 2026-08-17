@@ -1812,8 +1812,8 @@ app.get('/api/admin/stats/daily-matrix', authenticateSession, async (req, res) =
     const end = (endDate && /^\d{4}-\d{2}-\d{2}$/.test(endDate)) ? endDate : defaultEnd;
     const eventFilter = eventId ? sanitizeAlphanumeric(eventId, 50) : null;
 
-    // Get all active meal types to use as columns
-    const mealTypes = await dbAll('SELECT id, name FROM meal_types WHERE active = 1 ORDER BY start_time');
+    // Get all meal types for columns (include inactive so historical data isn't silently dropped)
+    const mealTypes = await dbAll('SELECT id, name FROM meal_types ORDER BY start_time');
 
     // Get available events (for filter dropdown)
     const events = await dbAll(
