@@ -598,6 +598,17 @@
   <script>
     // Configuration
     const API_BASE = window.location.protocol === 'file:' ? 'http://localhost:3000/api' : '/api';
+    const APP_TZ = 'Africa/Harare';
+
+    function getLocalToday() {
+      return new Date().toLocaleDateString('en-CA', { timeZone: APP_TZ });
+    }
+
+    function getLocalDaysAgo(days) {
+      const d = new Date();
+      d.setDate(d.getDate() - days);
+      return d.toLocaleDateString('en-CA', { timeZone: APP_TZ });
+    }
 
     // State
     let currentRole = 'user';
@@ -1198,7 +1209,7 @@
               </div>
               <div style="text-align: right;">
                 <p style="font-size: 11px; font-weight:600; text-transform: uppercase; color: var(--muted); letter-spacing:0.8px;">Report Date</p>
-                <p style="font-size: 13px; font-weight: 600;">${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}</p>
+                <p style="font-size: 13px; font-weight: 600;">${new Date().toLocaleDateString('en-GB', { timeZone: APP_TZ })} ${new Date().toLocaleTimeString('en-GB', { timeZone: APP_TZ })}</p>
               </div>
             </div>
           </div>
@@ -1315,7 +1326,7 @@
 
         let txHTML = '';
         transactions.forEach(tx => {
-          const time = tx.transaction_time ? new Date(tx.transaction_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'}) : '';
+          const time = tx.transaction_time ? new Date(tx.transaction_time).toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit', second:'2-digit', timeZone: APP_TZ}) : '';
           txHTML += `
             <tr>
               <td class="td-muted">${time}</td>
@@ -1437,7 +1448,7 @@
 
         let html = '';
         users.forEach(user => {
-          const tokenExpiry = user.latest_token ? new Date(user.token_expiry).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : '-';
+          const tokenExpiry = user.latest_token ? new Date(user.token_expiry).toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit', timeZone: APP_TZ}) : '-';
           const statusBadge = user.active ? '<span class="status status-delivered"><span class="status-dot"></span> Active</span>' : '<span class="status status-pending"><span class="status-dot"></span> Inactive</span>';
 
           html += `
@@ -1892,11 +1903,8 @@
       const eventId = document.getElementById('mealsPerDayEventFilter').value;
 
       if (!startDate || !endDate) {
-        const today = new Date();
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(today.getDate() - 30);
-        endDate = today.toISOString().split('T')[0];
-        startDate = thirtyDaysAgo.toISOString().split('T')[0];
+        endDate = getLocalToday();
+        startDate = getLocalDaysAgo(30);
         document.getElementById('reportStartDate').value = startDate;
         document.getElementById('reportEndDate').value = endDate;
       }
@@ -1960,7 +1968,7 @@
       const container = document.getElementById('mealsPerTimeResults');
 
       if (!date) {
-        date = new Date().toISOString().split('T')[0];
+        date = getLocalToday();
         document.getElementById('reportTimeDate').value = date;
       }
 
@@ -2114,7 +2122,7 @@
         }
 
         const printWindow = window.open('', '_blank');
-        const currentDate = new Date().toLocaleString();
+        const currentDate = new Date().toLocaleString('en-GB', { timeZone: APP_TZ });
 
         let reportHTML = `
           <!DOCTYPE html>
@@ -2142,7 +2150,7 @@
         `;
 
         transactions.forEach((tx, index) => {
-          const time = tx.transaction_time ? new Date(tx.transaction_time).toLocaleString() : 'N/A';
+          const time = tx.transaction_time ? new Date(tx.transaction_time).toLocaleString('en-GB', { timeZone: APP_TZ }) : 'N/A';
           reportHTML += `
             <tr>
               <td>${index + 1}</td>
@@ -2219,7 +2227,7 @@
         const u = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = u;
-        a.download = `live-feed-report-${new Date().toISOString().split('T')[0]}.pdf`;
+        a.download = `live-feed-report-${getLocalToday()}.pdf`;
         a.click();
         URL.revokeObjectURL(u);
       } catch (err) {
@@ -2234,11 +2242,8 @@
       const container = document.getElementById('dailyMatrixContainer');
 
       if (!start || !end) {
-        const today = new Date();
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(today.getDate() - 30);
-        end = today.toISOString().split('T')[0];
-        start = thirtyDaysAgo.toISOString().split('T')[0];
+        end = getLocalToday();
+        start = getLocalDaysAgo(30);
         document.getElementById('matrixStartDate').value = start;
         document.getElementById('matrixEndDate').value = end;
       }
@@ -2343,7 +2348,7 @@
       if (!data) { alert('Please load the report first.'); return; }
 
       const printWindow = window.open('', '_blank');
-      const currentDate = new Date().toLocaleString();
+      const currentDate = new Date().toLocaleString('en-GB', { timeZone: APP_TZ });
       const eventLabel = data.selectedEvent ? data.selectedEvent.name : 'All Events (Legacy + Event)';
 
       let tablesHtml = '';
@@ -2417,7 +2422,7 @@
       if (!data) { alert('Please load the report first.'); return; }
 
       const printWindow = window.open('', '_blank');
-      const currentDate = new Date().toLocaleString();
+      const currentDate = new Date().toLocaleString('en-GB', { timeZone: APP_TZ });
 
       let tableRows = '';
       let grandTotal = 0;

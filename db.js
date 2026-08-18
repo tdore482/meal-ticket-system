@@ -17,7 +17,7 @@ const poolConfig = process.env.PGHOST
       max: 10,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 30000,
-      options: '-c statement_timeout=30000',
+      options: `-c statement_timeout=30000 -c timezone=${process.env.TIMEZONE || 'Africa/Harare'}`,
     }
   : {
       connectionString: process.env.DATABASE_URL,
@@ -25,7 +25,7 @@ const poolConfig = process.env.PGHOST
       max: 10,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 30000,
-      options: '-c statement_timeout=30000',
+      options: `-c statement_timeout=30000 -c timezone=${process.env.TIMEZONE || 'Africa/Harare'}`,
     };
 
 const pool = new Pool(poolConfig);

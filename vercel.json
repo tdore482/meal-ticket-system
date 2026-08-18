@@ -1,4 +1,7 @@
 {
+  "env": {
+    "TZ": "Africa/Harare"
+  },
   "rewrites": [
     {
       "source": "/api/:path*",

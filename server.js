@@ -1355,11 +1355,11 @@ app.get('/api/admin/reports', authenticateSession, async (req, res) => {
       limit = '50'
     } = req.query;
 
-    const defaultStart = new Date();
-    defaultStart.setDate(defaultStart.getDate() - 30);
-    const defaultEnd = new Date().toISOString().split('T')[0];
+    const defaultEnd = getAppToday();
+    const d = new Date(); d.setDate(d.getDate() - 30);
+    const defaultStart = d.toLocaleDateString('en-CA', { timeZone: APP_TIMEZONE });
 
-    const start = (startDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate)) ? startDate : defaultStart.toISOString().split('T')[0];
+    const start = (startDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate)) ? startDate : defaultStart;
     const end = (endDate && /^\d{4}-\d{2}-\d{2}$/.test(endDate)) ? endDate : defaultEnd;
     const offsetNum = Math.max(0, parseInt(offset) || 0);
     const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 50));
@@ -1686,11 +1686,11 @@ app.get('/api/admin/stats/meals-per-day', authenticateSession, async (req, res) 
     }
 
     const { startDate, endDate, eventId } = req.query;
-    const defaultStart = new Date();
-    defaultStart.setDate(defaultStart.getDate() - 30);
-    const defaultEnd = new Date().toISOString().split('T')[0];
+    const defaultEnd = getAppToday();
+    const d = new Date(); d.setDate(d.getDate() - 30);
+    const defaultStart = d.toLocaleDateString('en-CA', { timeZone: APP_TIMEZONE });
 
-    const start = (startDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate)) ? startDate : defaultStart.toISOString().split('T')[0];
+    const start = (startDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate)) ? startDate : defaultStart;
     const end = (endDate && /^\d{4}-\d{2}-\d{2}$/.test(endDate)) ? endDate : defaultEnd;
     const eventFilter = eventId ? sanitizeAlphanumeric(eventId, 50) : null;
 
@@ -1813,11 +1813,11 @@ app.get('/api/admin/stats/daily-matrix', authenticateSession, async (req, res) =
     }
 
     const { startDate, endDate, eventId } = req.query;
-    const defaultStart = new Date();
-    defaultStart.setDate(defaultStart.getDate() - 30);
-    const defaultEnd = new Date().toISOString().split('T')[0];
+    const defaultEnd = getAppToday();
+    const d = new Date(); d.setDate(d.getDate() - 30);
+    const defaultStart = d.toLocaleDateString('en-CA', { timeZone: APP_TIMEZONE });
 
-    const start = (startDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate)) ? startDate : defaultStart.toISOString().split('T')[0];
+    const start = (startDate && /^\d{4}-\d{2}-\d{2}$/.test(startDate)) ? startDate : defaultStart;
     const end = (endDate && /^\d{4}-\d{2}-\d{2}$/.test(endDate)) ? endDate : defaultEnd;
     const eventFilter = eventId ? sanitizeAlphanumeric(eventId, 50) : null;
 
@@ -1909,7 +1909,7 @@ app.get('/api/admin/stats/meals-per-time', authenticateSession, async (req, res)
     const { date, eventId } = req.query;
     const targetDate = (date && /^\d{4}-\d{2}-\d{2}$/.test(date))
       ? date
-      : new Date().toISOString().split('T')[0];
+      : getAppToday();
     const eventFilter = eventId ? sanitizeAlphanumeric(eventId, 50) : null;
 
     // Get available events for filter dropdown
@@ -2878,7 +2878,7 @@ app.get('/api/admin/live-feed/export-pdf', authenticateSession, async (req, res)
     doc.fontSize(12).font('Helvetica').text('Live Feed Transaction Report', { align: 'center' });
     doc.moveDown();
 
-    const currentDate = new Date().toLocaleString();
+    const currentDate = new Date().toLocaleString('en-GB', { timeZone: APP_TIMEZONE });
     doc.fontSize(10).font('Helvetica-Bold').text('Report Metadata:');
     doc.font('Helvetica').text(`Generated: ${currentDate}`);
     doc.text(`Total Transactions: ${transactions.length}`);
@@ -2922,7 +2922,7 @@ app.get('/api/admin/live-feed/export-pdf', authenticateSession, async (req, res)
         doc.fillColor('#1a1a1a');
       }
 
-      const time = tx.transaction_time ? new Date(tx.transaction_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A';
+      const time = tx.transaction_time ? new Date(tx.transaction_time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: APP_TIMEZONE }) : 'N/A';
       doc.text(time, 50, currentY + 5);
       doc.text(tx.user_name || 'N/A', 150, currentY + 5, { width: 140, ellipsis: true });
       doc.text(tx.vendor_name || 'N/A', 300, currentY + 5, { width: 140, ellipsis: true });
