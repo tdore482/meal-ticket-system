@@ -626,6 +626,9 @@
     // Admin Dashboard Refresh
     let adminRefreshInterval = null;
 
+    // Vendor Dashboard Refresh
+    let vendorRefreshInterval = null;
+
     // API Call Helper
     async function apiCall(endpoint, method = 'GET', body = null, timeoutMs = 20000) {
       const controller = new AbortController();
@@ -752,6 +755,10 @@
       if (adminRefreshInterval) {
         clearInterval(adminRefreshInterval);
         adminRefreshInterval = null;
+      }
+      if (vendorRefreshInterval) {
+        clearInterval(vendorRefreshInterval);
+        vendorRefreshInterval = null;
       }
       try { stopScanner(); } catch (e) {}
 
@@ -896,6 +903,9 @@
 
     // Vendor Dashboard
     async function renderVendorDashboard() {
+      if (vendorRefreshInterval) clearInterval(vendorRefreshInterval);
+
+      async function loadVendorData() {
       try {
         const data = await apiCall('/vendor/dashboard');
         const { vendor, activeMeal, mealTypes } = data;
@@ -944,8 +954,12 @@
           selector.classList.add('hidden');
         }
       } catch (err) {
-        showError('Failed to load vendor dashboard');
+        console.error('Failed to load vendor dashboard');
       }
+    }
+
+    await loadVendorData();
+    vendorRefreshInterval = setInterval(loadVendorData, 60000);
     }
 
     function selectMealType(id) {
