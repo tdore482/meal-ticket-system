@@ -134,6 +134,30 @@ function findActiveMeal(mealTypes) {
 
 // ===== END TIME UTILITY FUNCTIONS =====
 
+// DEBUG endpoint — remove after confirming timezone fix
+app.get('/api/debug/time', async (req, res) => {
+  const now = new Date();
+  const utcSeconds = (now.getUTCHours() * 3600) + (now.getUTCMinutes() * 60) + now.getUTCSeconds();
+  const localSeconds = getCurrentTimeInSeconds();
+  const mealTypes = await dbAll('SELECT id, name, start_time, end_time, active FROM meal_types WHERE active = 1 ORDER BY start_time');
+  const activeMeal = findActiveMeal(mealTypes);
+  res.json({
+    utc: now.toISOString(),
+    utcSeconds,
+    localSeconds,
+    appTimezone: APP_TIMEZONE,
+    activeMeal: activeMeal ? activeMeal.name : null,
+    mealTypes: mealTypes.map(m => ({
+      name: m.name,
+      start: m.start_time,
+      end: m.end_time,
+      startSec: timeStringToSeconds(m.start_time),
+      endSec: timeStringToSeconds(m.end_time),
+      inRange: isTimeInRange(localSeconds, m.start_time, m.end_time)
+    }))
+  });
+});
+
 // Utilities
 function generateId() {
   return crypto.randomBytes(8).toString('hex');
